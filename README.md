@@ -97,4 +97,4 @@ go build -o mgate-cloud ./cmd/mgate-cloud
 
 ## 📄 License
 
-[MIT](LICENSE) © 2026 Sundy (fengheasia)
+[MIT](LICENSE) © 2026 mgate-cloud authors
