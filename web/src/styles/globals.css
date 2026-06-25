@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  设计令牌（design tokens）。
+  采用 HSL 通道分量存储，配合 Tailwind 的 hsl(var(--x)) 取色，
+  既能统一主题，也为后续深色模式预留扩展位（再加一组 .dark 变量即可）。
+  当前为现代浅色风格：石板灰背景 + 靛蓝主色。
+*/
+:root {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --primary: 243 75% 59%;
+  --primary-foreground: 0 0% 100%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 243 75% 59%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --radius: 0.75rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 细腻的网格/光晕背景，提升登录等空旷页面的质感 */
+.bg-grid {
+  background-image:
+    radial-gradient(circle at 50% -20%, hsl(243 75% 59% / 0.10), transparent 60%),
+    linear-gradient(to bottom, hsl(210 40% 98%), hsl(210 40% 96%));
+}

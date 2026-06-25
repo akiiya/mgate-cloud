@@ -1,0 +1,39 @@
+# /etc/systemd/system/mgate-cloud.service
+#
+# 安装：
+#   sudo cp dist/mgate-cloud /opt/mgate-cloud/mgate-cloud
+#   sudo cp deploy/mgate-cloud.service /etc/systemd/system/
+#   sudo cp deploy/mgate-cloud.env.example /etc/mgate-cloud/mgate-cloud.env   # 按需修改
+#   sudo systemctl daemon-reload && sudo systemctl enable --now mgate-cloud
+
+[Unit]
+Description=mgate-cloud device management control plane
+After=network.target
+
+[Service]
+Type=simple
+User=mgate
+Group=mgate
+# 敏感配置（含 MGATE_APP_SECRET）放入该文件，权限设 600，不要写进本单元文件。
+EnvironmentFile=/etc/mgate-cloud/mgate-cloud.env
+ExecStart=/opt/mgate-cloud/mgate-cloud
+Restart=on-failure
+RestartSec=3
+
+# --- 安全加固：本服务不需要任何命令执行 / 提权能力 ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# 仅允许写入数据目录（SQLite 文件所在）。
+ReadWritePaths=/var/lib/mgate-cloud
+
+[Install]
+WantedBy=multi-user.target
