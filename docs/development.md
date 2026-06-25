@@ -22,7 +22,7 @@ scripts/             dev / build 脚本
 
 ```bash
 # 终端 A —— 后端
-./scripts/dev.sh
+bash scripts/dev.sh
 # 等价于：
 #   MGATE_ADMIN_USERNAME=admin MGATE_ADMIN_PASSWORD=change-me go run ./cmd/mgate-cloud
 
