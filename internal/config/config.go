@@ -35,9 +35,26 @@ type Config struct {
 	// 仅在系统中尚无任何管理员时生效，且明文口令绝不写入日志。
 	AdminUsername string
 	AdminPassword string
+	// AdminPasswordHash 为预先计算好的 bcrypt 口令哈希（来自 config.yaml）。
+	// 与 AdminPassword 二选一；优先使用 hash，避免明文落盘。
+	AdminPasswordHash string
+
+	// ConfigPath 是解析到的配置文件路径（用于 setup 生成/写回）。
+	ConfigPath string
+	// ConfigFileExists 标识启动时配置文件是否存在（用于判定是否进入 setup 模式）。
+	ConfigFileExists bool
 
 	// SessionTTL 是会话有效期。
 	SessionTTL time.Duration
+
+	// --- Phase 7：更新检查 / 自更新 ---
+
+	// UpdateCheckEnabled 控制是否允许检查更新。
+	UpdateCheckEnabled bool
+	// UpdateChannel 更新通道：stable / rc。
+	UpdateChannel string
+	// GitHubRepo 更新来源仓库（owner/repo）。
+	GitHubRepo string
 
 	// --- Phase 2：设备身份相关 ---
 
@@ -93,12 +110,19 @@ type Config struct {
 
 // 各配置项对应的环境变量名，集中声明便于文档与代码一致。
 const (
+	envConfigPath   = "MGATE_CONFIG"
 	envMode         = "MGATE_MODE"
 	envTrustProxy   = "MGATE_TRUST_PROXY_HEADERS"
 	envHTTPAddr     = "MGATE_HTTP_ADDR"
 	envDBPath       = "MGATE_DB_PATH"
 	envBaseURL      = "MGATE_BASE_URL"
 	envCookieSecure = "MGATE_COOKIE_SECURE"
+
+	envUpdateEnabled     = "MGATE_UPDATE_CHECK_ENABLED"
+	envUpdateChannel     = "MGATE_UPDATE_CHANNEL"
+	envGitHubRepo        = "MGATE_GITHUB_REPO"
+	defaultUpdateChannel = "stable"
+	defaultGitHubRepo    = "akiiya/mgate-cloud"
 
 	// 运行模式取值。
 	ModeDev             = "dev"
@@ -153,21 +177,58 @@ const (
 	defaultCmdBackoffSec = 10
 )
 
-// Load 从环境变量构建 Config。
-//
-// 该函数不做"致命校验"——所有项都有默认值，因此总能返回一份可用配置；
-// 是否提供 bootstrap 管理员等业务判断留给上层。
+// Load 从环境变量构建 Config（不读取配置文件）。保留供测试与纯 env 场景使用。
 func Load() Config {
+	return loadInternal(&FileConfig{})
+}
+
+// Resolve 解析配置：定位配置文件 → 以"环境变量 > 文件 > 默认值"的优先级构建 Config。
+//
+// 返回的 ResolveInfo 标识配置文件是否存在（供 setup 判定）。
+func Resolve() (Config, ResolveInfo, error) {
+	path := ResolveConfigPath()
+	info := ResolveInfo{ConfigPath: path, FileExists: fileExists(path)}
+
+	fc := &FileConfig{}
+	if info.FileExists {
+		loaded, err := LoadFile(path)
+		if err != nil {
+			return Config{}, info, err
+		}
+		fc = loaded
+	}
+
+	cfg := loadInternal(fc)
+	cfg.ConfigPath = path
+	cfg.ConfigFileExists = info.FileExists
+	return cfg, info, nil
+}
+
+// ResolveInfo 描述配置解析结果。
+type ResolveInfo struct {
+	ConfigPath string
+	FileExists bool
+}
+
+// loadInternal 以"环境变量 > 文件 > 默认值"的优先级构建 Config。
+//
+// 该函数不做"致命校验"——所有项都有默认值，总能返回一份可用配置。
+func loadInternal(fc *FileConfig) Config {
 	cfg := Config{
-		Mode:              normalizeMode(envString(envMode, ModeDev)),
-		HTTPAddr:          envString(envHTTPAddr, ":8080"),
-		DBPath:            envString(envDBPath, "./data/mgate-cloud.db"),
-		BaseURL:           envString(envBaseURL, "http://127.0.0.1:8080"),
-		CookieSecure:      envBool(envCookieSecure, false),
-		TrustProxyHeaders: envBool(envTrustProxy, false),
-		AdminUsername:     envString(envAdminUsername, ""),
-		AdminPassword:     envString(envAdminPassword, ""),
+		Mode:              normalizeMode(pickStr(envMode, fc.Mode, ModeDev)),
+		HTTPAddr:          pickStr(envHTTPAddr, fc.HTTPAddr, ":8080"),
+		DBPath:            pickStr(envDBPath, fc.DBPath, "./data/mgate-cloud.db"),
+		BaseURL:           pickStr(envBaseURL, fc.BaseURL, "http://127.0.0.1:8080"),
+		CookieSecure:      pickBool(envCookieSecure, fc.CookieSecure, false),
+		TrustProxyHeaders: pickBool(envTrustProxy, fc.TrustProxyHeaders, false),
+		AdminUsername:     pickStr(envAdminUsername, fc.AdminUsername, ""),
+		AdminPassword:     pickStr(envAdminPassword, fc.AdminPassword, ""),
+		AdminPasswordHash: fc.AdminPasswordHash,
 		SessionTTL:        time.Duration(envInt(envSessionTTLHours, defaultSessionHours)) * time.Hour,
+
+		UpdateCheckEnabled: pickBool(envUpdateEnabled, fc.UpdateCheckEnabled, true),
+		UpdateChannel:      pickStr(envUpdateChannel, fc.UpdateChannel, defaultUpdateChannel),
+		GitHubRepo:         pickStr(envGitHubRepo, fc.GitHubRepo, defaultGitHubRepo),
 
 		PairingTTL:        time.Duration(envInt(envPairingTTLMinutes, defaultPairingMinutes)) * time.Minute,
 		DeviceTokenBytes:  tokenBytes(envDeviceTokenBytes),
@@ -194,7 +255,7 @@ func Load() Config {
 	// AppSecret 处理：
 	//   - prod：为空时【不】生成，保留空值，交由 Validate 拒绝启动（安全硬要求）。
 	//   - dev/test：为空时临时生成，保证开箱即用；并标记 generated 以便告警。
-	cfg.AppSecret = envString(envAppSecret, "")
+	cfg.AppSecret = pickStr(envAppSecret, fc.AppSecret, "")
 	if cfg.AppSecret == "" && !cfg.IsProduction() {
 		if generated, err := util.RandomToken(appSecretBytes); err == nil {
 			cfg.AppSecret = generated

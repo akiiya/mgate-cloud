@@ -2,6 +2,33 @@
 
 本项目遵循语义化版本（SemVer）。日期为 UTC。
 
+## v0.1.0-rc2 — 发布候选 2
+
+发布工程与首次启动体验硬化，不改变命令协议与数据库 schema。
+
+### ✨ 新增
+
+- **无配置启动**：首次运行进入 Setup 页面（`/#/setup`），完成后生成 `config.yaml`。
+  配置优先级 **环境变量 > config.yaml > 默认值**；支持 `MGATE_CONFIG` 指定路径。
+- **检查更新 / 自更新**：Dashboard「检查更新」卡片；`/api/admin/update/check` 与 `/api/admin/update/apply`。
+  从 GitHub Releases 下载、校验 SHA256、仅替换二进制；不执行任何脚本/外部命令。
+- **运维就绪探测**：`/api/readyz`（数据库可用才就绪）。
+
+### 📦 发布工程
+
+- Release 资产改为标准压缩包：`*_linux_amd64.tar.gz` / `*_linux_arm64.tar.gz` / `*_windows_amd64.zip`，
+  内含二进制 + README/CHANGELOG/LICENSE + `deploy/` + `docs/`；`SHA256SUMS` 对压缩包计算。
+- GitHub Actions：`dev`/PR 跑 CI；`main` 合并后自动测试、按 `VERSION` 打 tag、打包并发布（已存在 tag 则跳过，不覆盖）。
+
+### 🔒 安全
+
+- Setup 仅保存口令哈希（不写明文），`app_secret` 可自动生成；`config.yaml` 收紧 0600。
+- 自更新严格校验 SHA256、保留 `.bak` 可回滚；无 `os/exec` / 远程 shell。
+
+### 🧭 分支流程
+
+- `main` 锁定，开发在 `dev`，经 GitHub 手动合并到 `main` 触发发布。
+
 ## v0.1.0-rc1 — 发布候选 1
 
 首个发布候选版本：完成 Phase 1–5 的设备管理控制面，并经过发布前硬化。

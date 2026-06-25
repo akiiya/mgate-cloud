@@ -26,10 +26,15 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
 	log.SetPrefix("[mgate-cloud] ")
 
-	cfg := config.Load()
+	// 解析配置：环境变量 > config.yaml > 默认值。无配置文件时进入 setup 模式（由 app 判定）。
+	cfg, info, err := config.Resolve()
+	if err != nil {
+		log.Fatalf("加载配置失败: %v", err)
+	}
 
-	// 启动横幅：版本、模式、监听地址、数据库路径——绝不输出 secret。
-	log.Printf("mgate-cloud %s 启动: mode=%s addr=%s db=%q", version.Version, cfg.Mode, cfg.HTTPAddr, cfg.DBPath)
+	// 启动横幅：版本、模式、监听地址、数据库路径、配置文件——绝不输出 secret。
+	log.Printf("mgate-cloud %s 启动: mode=%s addr=%s db=%q config=%q(exists=%t)",
+		version.Version, cfg.Mode, cfg.HTTPAddr, cfg.DBPath, info.ConfigPath, info.FileExists)
 
 	// 生产模式硬校验：MGATE_APP_SECRET 必须显式配置，否则拒绝启动。
 	if err := cfg.Validate(); err != nil {

@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Activity, Database, KeyRound, Radar, ShieldX, ArrowRight, Wifi, WifiOff, Router, CheckCircle2, XCircle, Terminal, Clock, AlertTriangle, DownloadCloud } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Activity, Database, KeyRound, Radar, ShieldX, ArrowRight, Wifi, WifiOff, Router, CheckCircle2, XCircle, Terminal, Clock, AlertTriangle, DownloadCloud, RefreshCw, Download } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { deviceApi } from '@/api/devices'
 import { commandApi } from '@/api/commands'
+import { updateApi, type UpdateCheck } from '@/api/update'
+import { ApiError } from '@/api/client'
+import { formatDateTime } from '@/lib/format'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ErrorAlert } from '@/components/ui/alert'
 
 /** 统计卡片：图标 + 标签 + 大数字，用于设备在线概览。 */
 function StatCard({
@@ -32,6 +37,109 @@ function StatCard({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * 检查更新卡片：查询 GitHub 最新版本，提示是否有更新，并可下载安装。
+ * 更新前提醒备份数据库；自更新只替换二进制，需重启生效。
+ */
+function UpdateCard() {
+  const [info, setInfo] = useState<UpdateCheck | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [applyMsg, setApplyMsg] = useState<string | null>(null)
+
+  async function check() {
+    setError(null)
+    setApplyMsg(null)
+    setChecking(true)
+    try {
+      setInfo(await updateApi.check())
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : '检查更新失败')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  async function apply() {
+    if (!window.confirm('⚠️ 更新前请先备份数据库。\n确认下载并安装最新版本？（更新只替换程序二进制，安装后需重启服务）')) {
+      return
+    }
+    setError(null)
+    setApplying(true)
+    try {
+      const r = await updateApi.apply()
+      setApplyMsg(r.message)
+      setInfo((prev) => (prev ? { ...prev, has_update: false } : prev))
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : '更新失败')
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <RefreshCw className="h-5 w-5 text-primary" aria-hidden />
+          <CardTitle>检查更新</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error && <ErrorAlert message={error} />}
+        {applyMsg && (
+          <div className="rounded-md border border-success/20 bg-success/5 px-3.5 py-2.5 text-sm text-success">{applyMsg}</div>
+        )}
+
+        {info ? (
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+            <Field label="当前版本">{info.current_version || 'dev'}</Field>
+            <Field label="最新版本">
+              {info.latest_version}
+              {info.has_update ? (
+                <Badge tone="primary" className="ml-2">有新版本</Badge>
+              ) : (
+                <Badge tone="success" className="ml-2">已是最新</Badge>
+              )}
+            </Field>
+            <Field label="发布时间">{formatDateTime(info.published_at)}</Field>
+            <Field label="通道">{info.channel}</Field>
+            {info.has_update && <Field label="下载资产">{info.asset_available ? info.asset_name : '该平台暂无对应资产'}</Field>}
+          </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">点击「检查更新」查询是否有可用的新版本。</p>
+        )}
+
+        <p className="text-xs text-muted-foreground">⚠️ 自更新只替换程序二进制并需重启生效；执行前请务必备份数据库。</p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" loading={checking} onClick={check}>
+            <RefreshCw className="h-4 w-4" aria-hidden />
+            检查更新
+          </Button>
+          {info?.has_update && info.asset_available && (
+            <Button size="sm" loading={applying} onClick={apply}>
+              <Download className="h-4 w-4" aria-hidden />
+              下载并更新
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 信息字段（更新卡片内）。 */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 flex items-center text-sm">{children}</dd>
+    </div>
   )
 }
 
@@ -152,6 +260,9 @@ export function DashboardPage() {
         <StatCard icon={AlertTriangle} label="超时命令" value={cmdCounts.timeout} tone="neutral" />
         <StatCard icon={DownloadCloud} label="最近 Pull 设备" value={counts.recentPull} tone="primary" />
       </section>
+
+      {/* 检查更新 */}
+      <UpdateCard />
 
       {/* 状态卡片网格，响应式：手机 1 列、平板 2 列、桌面 4 列 */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

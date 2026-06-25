@@ -30,6 +30,31 @@ func envBool(key string, def bool) bool {
 	return parsed
 }
 
+// pickStr 以"环境变量 > 文件值 > 默认值"返回字符串。
+func pickStr(envKey, fileVal, def string) string {
+	if v := strings.TrimSpace(os.Getenv(envKey)); v != "" {
+		return v
+	}
+	if fileVal != "" {
+		return fileVal
+	}
+	return def
+}
+
+// pickBool 以"环境变量 > 文件值 > 默认值"返回布尔。fileVal 为 nil 表示文件未设置。
+func pickBool(envKey string, fileVal *bool, def bool) bool {
+	if v := strings.TrimSpace(os.Getenv(envKey)); v != "" {
+		if parsed, err := strconv.ParseBool(v); err == nil {
+			return parsed
+		}
+		return def
+	}
+	if fileVal != nil {
+		return *fileVal
+	}
+	return def
+}
+
 // envInt 读取整数环境变量，无法解析时回退默认值。
 func envInt(key string, def int) int {
 	v := strings.TrimSpace(os.Getenv(key))
