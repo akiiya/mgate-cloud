@@ -23,7 +23,7 @@
 
 ```bash
 # 一键构建（前端 + 内嵌单二进制，注入版本号）
-./scripts/build.sh
+bash scripts/build.sh
 
 # 零配置启动：直接运行，浏览器访问后进入 /#/setup 完成初始化（生成 config.yaml）
 ./dist/mgate-cloud
