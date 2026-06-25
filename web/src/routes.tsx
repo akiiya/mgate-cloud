@@ -9,6 +9,7 @@ import { DevicesPage } from '@/pages/devices'
 import { DeviceDetailPage } from '@/pages/device-detail'
 import { CommandsPage } from '@/pages/commands'
 import { CommandDetailPage } from '@/pages/command-detail'
+import { SetupPage } from '@/pages/setup'
 import { NotFoundPage } from '@/pages/not-found'
 
 /** 会话探测期间的全屏加载，避免登录态未确定时的页面闪烁。 */
@@ -37,8 +38,25 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
  * 路径示例：/#/login、/#/dashboard。
  */
 export function AppRoutes() {
+  const { initializing, setupRequired } = useAuth()
+
+  // 探测期间统一显示加载，避免在 setup/login 之间闪烁。
+  if (initializing) return <FullScreenLoader />
+
+  // 未初始化：强制进入 Setup，其余路径一律重定向到 /setup。
+  if (setupRequired) {
+    return (
+      <Routes>
+        <Route path="/setup" element={<SetupPage />} />
+        <Route path="*" element={<Navigate to="/setup" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <Routes>
+      {/* 已初始化时访问 /setup 直接回首页 */}
+      <Route path="/setup" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/dashboard"

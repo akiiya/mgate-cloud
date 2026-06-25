@@ -33,6 +33,15 @@ var (
 	ErrInternal           = &Error{Code: "internal_error", Message: "服务器内部错误", httpStatus: http.StatusInternalServerError}
 	ErrNotReady           = &Error{Code: "not_ready", Message: "服务未就绪", httpStatus: http.StatusServiceUnavailable}
 
+	// --- Phase 7：首次配置（setup）与更新 ---
+
+	// ErrSetupRequired 表示系统尚未完成初始配置，需先完成 setup。
+	ErrSetupRequired = &Error{Code: "setup_required", Message: "系统尚未初始化，请先完成 Setup", httpStatus: http.StatusConflict}
+	// ErrSetupAlreadyDone 表示 setup 已完成，不可重复执行。
+	ErrSetupAlreadyDone = &Error{Code: "setup_already_done", Message: "系统已初始化", httpStatus: http.StatusConflict}
+	// ErrUpdateDisabled 表示更新检查/自更新被禁用。
+	ErrUpdateDisabled = &Error{Code: "update_disabled", Message: "更新功能已禁用", httpStatus: http.StatusForbidden}
+
 	// --- Phase 2：设备身份相关 ---
 
 	// ErrDeviceNotFound 设备不存在。

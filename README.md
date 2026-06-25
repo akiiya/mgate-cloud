@@ -1,6 +1,6 @@
 # mgate-cloud ☁️
 
-公网部署的 **mgate 设备管理控制面**。当前版本 **v0.1.0-rc1**。
+公网部署的 **mgate 设备管理控制面**。当前版本 **v0.1.0-rc2**。
 
 管理员经浏览器集中管理随身 WiFi 设备；设备上的 `mgate-agent` 主动连接 cloud
 （WebSocket 主通道 + HTTPS Pull 兜底），cloud 经**白名单 action** 下发指令并回收结果。
@@ -25,10 +25,15 @@
 # 一键构建（前端 + 内嵌单二进制，注入版本号）
 ./scripts/build.sh
 
-# 启动（首次用环境变量创建管理员；dev 模式开箱即用）
+# 零配置启动：直接运行，浏览器访问后进入 /#/setup 完成初始化（生成 config.yaml）
+./dist/mgate-cloud
+# 打开 http://127.0.0.1:8080/  → 自动跳转 /#/setup
+
+# 或用环境变量直接创建管理员（跳过 Setup，向后兼容）
 MGATE_ADMIN_USERNAME=admin MGATE_ADMIN_PASSWORD=change-me ./dist/mgate-cloud
-# 打开 http://127.0.0.1:8080/#/login
 ```
+
+> 首次初始化（无配置启动）流程见 [docs/setup.md](docs/setup.md)。配置优先级：**环境变量 > config.yaml > 默认值**。
 
 或用 Make：`make build`、`make test`、`make run`、`make help`。
 
@@ -45,6 +50,7 @@ go build -o mgate-cloud ./cmd/mgate-cloud
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
+| `MGATE_CONFIG` | （空） | 指定 config.yaml 路径（优先于 ./config.yaml、/etc/mgate-cloud/config.yaml） |
 | `MGATE_MODE` | `dev` | `dev`/`test`/`prod`；prod 下 `MGATE_APP_SECRET` 为空将拒绝启动 |
 | `MGATE_HTTP_ADDR` | `:8080` | 监听地址 |
 | `MGATE_DB_PATH` | `./data/mgate-cloud.db` | SQLite 路径（目录自动创建） |
@@ -72,7 +78,10 @@ go build -o mgate-cloud ./cmd/mgate-cloud
 | [docs/agent-pull.md](docs/agent-pull.md) | HTTPS Pull 兜底协议 |
 | [docs/commands.md](docs/commands.md) | 白名单命令、状态机、结果存储 |
 | [docs/security.md](docs/security.md) | 安全边界与硬化 |
+| [docs/setup.md](docs/setup.md) | 无配置启动与初始化、config.yaml |
+| [docs/update.md](docs/update.md) | 检查更新 / 自更新 |
 | [docs/deployment.md](docs/deployment.md) | 生产部署（systemd / 反代 / 备份） |
+| [docs/release-assets.md](docs/release-assets.md) | 发布资产格式与 dev/main 分支流程 |
 | [docs/release-checklist.md](docs/release-checklist.md) | 发布清单 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更 |
 

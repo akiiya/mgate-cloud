@@ -20,11 +20,14 @@ import (
 	"mgate-cloud/internal/device"
 	"mgate-cloud/internal/hub"
 	"mgate-cloud/internal/model"
+	"mgate-cloud/internal/update"
 	"mgate-cloud/internal/util"
+	"mgate-cloud/internal/version"
 	"mgate-cloud/web"
 
 	"net/http"
 	"strings"
+	"sync/atomic"
 )
 
 // App 持有应用运行所需的核心资源与已装配的 HTTP 处理器。
@@ -63,10 +66,25 @@ func New(cfg config.Config) (*App, error) {
 	authService := auth.NewService(adminStore, sessionStore, cfg.SessionTTL)
 	auditService := audit.NewService(database, clock)
 
-	// 在装配完成后处理 bootstrap 管理员（可能写审计日志）。
-	if err := bootstrapAdmin(cfg, authService, auditService); err != nil {
+	// 判定是否进入 setup（无配置启动）模式：
+	// 无配置文件 + 无 bootstrap 管理员 env + 库中尚无管理员。
+	adminCount, err := authService.AdminCount(context.Background())
+	if err != nil {
 		database.Close()
-		return nil, err
+		return nil, fmt.Errorf("app: 统计管理员失败: %w", err)
+	}
+	setupRequired := !cfg.ConfigFileExists && !cfg.HasBootstrapAdmin() && adminCount == 0
+	var setupDone atomic.Bool
+	setupDone.Store(!setupRequired)
+
+	if setupRequired {
+		log.Printf("app: 进入 setup 模式——未发现配置文件与管理员，请浏览器访问 /#/setup 完成初始化")
+	} else {
+		// 非 setup 模式：照常处理 bootstrap 管理员（可能写审计日志）。
+		if err := bootstrapAdmin(cfg, authService, auditService); err != nil {
+			database.Close()
+			return nil, err
+		}
 	}
 
 	// AppSecret 为临时生成时告警：生产环境必须固定且足够随机，
@@ -108,9 +126,14 @@ func New(cfg config.Config) (*App, error) {
 	reaperCtx, cancel := context.WithCancel(context.Background())
 	go commandService.RunReaper(reaperCtx, cfg.CommandReaperInterval)
 
+	// 更新服务（Phase 7）：来源 GitHub Releases，按当前版本与配置判断。
+	updateService := update.NewService(cfg.GitHubRepo, cfg.UpdateChannel, version.Version, cfg.UpdateCheckEnabled)
+
 	handlers := admin.NewHandlers(authService, auditService, cfg.CookieSecure, cfg.SessionTTL)
 	deviceHandlers := admin.NewDeviceHandlers(deviceService, auditService)
 	commandHandlers := admin.NewCommandHandlers(commandService)
+	setupHandlers := admin.NewSetupHandlers(authService, auditService, &setupDone, cfg)
+	updateHandlers := admin.NewUpdateHandlers(updateService, auditService)
 	agentHandlers := agent.NewHandlers(deviceService, auditService)
 	wsHandlers := agent.NewWSHandlers(deviceService, commandService, auditService, connectionHub, cfg.WSHeartbeatInterval, cfg.WSOfflineAfter, cfg.WSMaxMessageBytes)
 	pullHandlers := agent.NewPullHandlers(deviceService, commandService, auditService, cfg.PullMaxBodyBytes, cfg.PullMaxCommands, cfg.PullDefaultInterval)
@@ -127,12 +150,15 @@ func New(cfg config.Config) (*App, error) {
 		auth:       handlers,
 		devices:    deviceHandlers,
 		commands:   commandHandlers,
+		setup:      setupHandlers,
+		update:     updateHandlers,
 		agent:      agentHandlers,
 		ws:         wsHandlers,
 		pull:       pullHandlers,
 		authSvc:    authService,
 		distFS:     distFS,
 		trustProxy: cfg.TrustProxyHeaders,
+		setupDone:  &setupDone,
 		// 就绪探测：数据库可 Ping 即视为就绪。
 		readyCheck: func(ctx context.Context) error { return database.PingContext(ctx) },
 	})

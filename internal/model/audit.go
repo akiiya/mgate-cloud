@@ -22,6 +22,9 @@ const (
 	ActionLoginFailed           = "admin.login.failed"
 	ActionLogout                = "admin.logout"
 	ActionBootstrapAdminCreated = "system.bootstrap_admin.created"
+	ActionSetupCompleted        = "system.setup.completed"
+	ActionUpdateChecked         = "system.update.checked"
+	ActionUpdateApplied         = "system.update.applied"
 
 	// Phase 2：设备身份相关事件
 	ActionDeviceCreate      = "device.create"
