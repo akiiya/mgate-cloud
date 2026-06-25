@@ -1,10 +1,10 @@
 name: CI
 
+# dev 分支推送与所有 PR 运行 CI（不发布）。main 的发布由 release.yml 负责。
 on:
   push:
-    branches: [main]
+    branches: [dev]
   pull_request:
-    branches: [main]
 
 jobs:
   build-test:
@@ -34,7 +34,7 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      # go test 包含禁止 os/exec / exec.Command / bash -c / sh -c 的静态安全测试。
+      # go test 含 internal/securitycheck：禁止 os/exec / exec.Command / bash -c / sh -c。
       - name: go test
         run: go test ./...
 

@@ -5,15 +5,37 @@
 > 现成模板见 `deploy/`：`mgate-cloud.service`（systemd）、`mgate-cloud.env.example`（环境变量）、
 > `Caddyfile.example`、`nginx.conf.example`。安全边界详见 [security.md](security.md)。
 
-## 构建产物
+## 获取产物
+
+**方式一：下载 Release 压缩包**（推荐）
+
+从 GitHub Release 下载对应平台压缩包并校验：
 
 ```bash
-./scripts/build.sh
-# 产物：dist/mgate-cloud（自包含，已内嵌前端）
+sha256sum -c SHA256SUMS
+tar -xzf mgate-cloud_<版本>_linux_amd64.tar.gz   # Windows 为 .zip
 ```
 
-该二进制使用纯 Go 的 SQLite 驱动（`CGO_ENABLED=0`），无需系统 libsqlite3，
-便于跨平台分发与最小化镜像。
+压缩包含二进制 + README/CHANGELOG/LICENSE + `deploy/` 模板 + `docs/`。
+资产格式与分支流程见 [release-assets.md](release-assets.md)。
+
+**方式二：本地构建**
+
+```bash
+./scripts/build.sh      # 产物：dist/mgate-cloud（自包含，已内嵌前端）
+```
+
+二进制使用纯 Go 的 SQLite 驱动（`CGO_ENABLED=0`），无需系统 libsqlite3，便于分发与最小化镜像。
+
+## 初始化方式
+
+二选一：
+
+- **Setup 页面（零配置）**：直接运行二进制 → 浏览器进入 `/#/setup` 完成初始化并生成 `config.yaml`。
+  见 [setup.md](setup.md)。
+- **环境变量 / 预置 config.yaml**：如下「运行」小节，适合自动化部署。
+
+配置优先级：**环境变量 > config.yaml > 默认值**。
 
 ## 运行
 

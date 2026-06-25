@@ -10,6 +10,7 @@
 - [ ] `npm --prefix web run build` 通过（含 `tsc` 类型检查）
 - [ ] `go build -o mgate-cloud ./cmd/mgate-cloud` 通过
 - [ ] `./scripts/build.sh` 生成 `dist/mgate-cloud`
+- [ ] `./scripts/release.sh` 生成多平台压缩包（tar.gz/zip）与 `SHA256SUMS`
 
 ## 2. 安全边界
 
@@ -21,9 +22,16 @@
 ## 3. 版本与产物
 
 - [ ] `VERSION` 文件已更新为目标版本（如 `0.1.0-rc1`）
-- [ ] `CHANGELOG.md` 已补充该版本条目
+- [ ] `CHANGELOG.md` 已补充该版本条目，且与 `VERSION` 一致
 - [ ] 二进制启动日志显示正确版本（`mgate-cloud <version> 启动...`）
 - [ ] 最终二进制内嵌前端：删除源码 `web/dist` 后已编译二进制仍能提供页面
+- [ ] Release 资产为压缩包（`*_linux_amd64.tar.gz` / `*_linux_arm64.tar.gz` / `*_windows_amd64.zip`），`SHA256SUMS` 对压缩包计算
+
+## 3.5 首次初始化（Setup）
+
+- [ ] 无 config.yaml、无环境变量时启动进入 Setup 模式，`/#/setup` 可访问
+- [ ] Setup 完成生成 `config.yaml`，且**不含明文密码**（仅 `admin_password_hash`）
+- [ ] 再次启动读取 config.yaml，不再进入 Setup
 
 ## 4. 生产配置核对（部署前）
 
@@ -43,7 +51,10 @@
 - [ ] agent 可经 WS 连接、可经 Pull 兜底
 - [ ] 命令可下发并回收结果
 
-## 6. 发布
+## 6. 发布（dev → main）
 
-- [ ] 打标签 `vX.Y.Z`（触发 Release workflow）
-- [ ] 校验 Release 产物 SHA256SUMS
+- [ ] 所有改动在 `dev` 分支完成并通过 CI
+- [ ] 通过 GitHub 页面将 `dev` 合并到 `main`（main 已锁定，不直接推送）
+- [ ] `main` 的 Release workflow 自动：跑 CI → 若 `v<VERSION>` 不存在则打 tag → 打包 → 发布
+- [ ] 确认未覆盖已有 tag/release（如版本已发布，需提升 `VERSION` 重新发布）
+- [ ] 校验 Release 产物 `SHA256SUMS`

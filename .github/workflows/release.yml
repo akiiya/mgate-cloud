@@ -1,11 +1,11 @@
 name: Release
 
-# 推送 v* 标签时触发，构建多平台单二进制并发布到 GitHub Release。
-# 关键构建命令与 CI 一致，可用 ./scripts/release.sh 在本地等价验证。
+# main 合并后自动：测试 → 读取 VERSION → 若 tag 不存在则打 tag → 打包 → 发布。
+# 也支持手动 workflow_dispatch 重跑。
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 需要完整历史与标签以判断 tag 是否已存在
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -29,35 +31,45 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build frontend
-        run: |
-          npm --prefix web ci || npm --prefix web install
-          npm --prefix web run build
-
-      - name: Test
-        run: go test ./...
-
-      - name: Build cross-platform binaries
+      # 读取版本并判断对应 tag 是否已存在（存在则跳过发布，绝不覆盖）。
+      - name: Resolve version
+        id: ver
         run: |
           VERSION="$(tr -d ' \t\n\r' < VERSION)"
-          LDFLAGS="-s -w -X mgate-cloud/internal/version.Version=${VERSION}"
-          mkdir -p dist
-          build() {
-            local goos="$1" goarch="$2" ext="$3"
-            local out="dist/mgate-cloud_${goos}_${goarch}${ext}"
-            echo "building ${out}"
-            CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
-              go build -trimpath -ldflags "${LDFLAGS}" -o "${out}" ./cmd/mgate-cloud
-          }
-          build linux amd64 ""
-          build linux arm64 ""
-          build windows amd64 ".exe"
-          ( cd dist && sha256sum mgate-cloud_* > SHA256SUMS )
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "${TAG}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::tag ${TAG} 已存在，跳过发布（不覆盖已有 tag/release）"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 以下步骤仅在 tag 不存在时执行。
+      - name: Build & package (test + frontend + multi-platform archives)
+        if: steps.ver.outputs.exists == 'false'
+        run: ./scripts/release.sh
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+
+      - name: Create and push tag
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
 
       - name: Publish GitHub Release
+        if: steps.ver.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           body_path: CHANGELOG.md
+          fail_on_unmatched_files: true
           files: |
-            dist/mgate-cloud_*
+            dist/mgate-cloud_*.tar.gz
+            dist/mgate-cloud_*.zip
             dist/SHA256SUMS

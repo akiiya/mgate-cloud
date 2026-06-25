@@ -150,6 +150,20 @@ func (s *Service) AdminCount(ctx context.Context) (int, error) {
 	return s.admins.Count(ctx)
 }
 
+// CreateInitialAdmin 在系统尚无管理员时，用预先计算的 bcrypt 哈希创建管理员（供 setup 使用）。
+//
+// 仅当当前无任何管理员时才创建，避免 setup 被重复触发产生多个账户。
+func (s *Service) CreateInitialAdmin(ctx context.Context, username, passwordHash string) (model.Admin, error) {
+	count, err := s.admins.Count(ctx)
+	if err != nil {
+		return model.Admin{}, err
+	}
+	if count > 0 {
+		return model.Admin{}, fmt.Errorf("auth: 已存在管理员，拒绝重复初始化")
+	}
+	return s.admins.Create(ctx, username, passwordHash)
+}
+
 // ResolveSession 根据原始令牌解析出有效会话对应的管理员（供鉴权中间件使用）。
 func (s *Service) ResolveSession(ctx context.Context, rawToken string) (model.Admin, error) {
 	sess, err := s.sessions.FindActiveByToken(ctx, rawToken)

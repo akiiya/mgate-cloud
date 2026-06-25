@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
+	"sync/atomic"
 
 	"mgate-cloud/internal/admin"
 	"mgate-cloud/internal/agent"
@@ -19,12 +21,15 @@ type routeDeps struct {
 	auth       *admin.Handlers
 	devices    *admin.DeviceHandlers
 	commands   *admin.CommandHandlers
+	setup      *admin.SetupHandlers
+	update     *admin.UpdateHandlers
 	agent      *agent.Handlers
 	ws         *agent.WSHandlers
 	pull       *agent.PullHandlers
 	authSvc    *auth.Service
 	distFS     fs.FS
 	trustProxy bool
+	setupDone  *atomic.Bool
 	readyCheck func(ctx context.Context) error // 就绪探测（DB 可用即就绪）
 }
 
@@ -50,6 +55,10 @@ func buildRoutes(d routeDeps) http.Handler {
 	apiMux.HandleFunc("GET /api/readyz", readyzHandler(d.readyCheck))
 	apiMux.HandleFunc("GET /api/auth/csrf", d.auth.CSRF)
 
+	// 首次初始化（setup mode）：始终可访问，由 setup 守卫白名单放行。
+	apiMux.HandleFunc("GET /api/setup/status", d.setup.Status)
+	apiMux.HandleFunc("POST /api/setup/complete", d.setup.Complete)
+
 	// 认证。
 	apiMux.Handle("POST /api/auth/login", admin.RequireCSRF(http.HandlerFunc(d.auth.Login)))
 	apiMux.Handle("GET /api/auth/me", authed(d.auth.Me))
@@ -69,17 +78,40 @@ func buildRoutes(d routeDeps) http.Handler {
 	apiMux.Handle("POST /api/admin/devices/{device_id}/commands", authedWrite(d.commands.Create))
 	apiMux.Handle("POST /api/admin/commands/{command_id}/cancel", authedWrite(d.commands.Cancel))
 
+	// 更新：检查需登录；应用需登录 + CSRF。
+	apiMux.Handle("GET /api/admin/update/check", authed(d.update.Check))
+	apiMux.Handle("POST /api/admin/update/apply", authedWrite(d.update.Apply))
+
 	// 设备 agent 公开接口：enroll（无 session/CSRF）与 WebSocket 接入（bearer token 鉴权）。
 	apiMux.HandleFunc("POST /api/agent/enroll", d.agent.Enroll)
 	apiMux.HandleFunc("GET /api/agent/ws", d.ws.ServeWS)
 	apiMux.HandleFunc("POST /api/agent/pull", d.pull.Pull)
 
 	root := http.NewServeMux()
-	root.Handle("/api/", apiMux)
+	// setup 守卫只包裹 /api/*；静态 SPA 始终可访问（以便加载 /#/setup 页面）。
+	root.Handle("/api/", setupGuard(d.setupDone, apiMux))
 	root.Handle("/", webui.NewSPAHandler(d.distFS))
 
 	// 中间件自外向内：请求 ID → 客户端 IP（按可信代理策略）→ panic 恢复 → 业务路由。
 	return audit.RequestID(audit.RealIP(d.trustProxy)(recoverMiddleware(root)))
+}
+
+// setupGuard 在 setup 未完成时，仅放行 healthz/readyz/setup 接口，其余 /api/* 返回 setup_required。
+//
+// setupDone 为共享原子标志：setup 完成后翻转为 true，无需重启即可放行后续请求。
+func setupGuard(setupDone *atomic.Bool, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if setupDone == nil || setupDone.Load() {
+			next.ServeHTTP(w, r)
+			return
+		}
+		p := r.URL.Path
+		if p == "/api/healthz" || p == "/api/readyz" || strings.HasPrefix(p, "/api/setup/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		api.WriteError(w, api.ErrSetupRequired)
+	})
 }
 
 // readyzHandler 返回就绪探测处理器：依赖检查通过返回 200，否则 503。
