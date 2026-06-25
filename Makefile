@@ -31,7 +31,7 @@ security: ## 仅运行禁止远程 shell 能力的静态安全测试
 	go test ./internal/securitycheck/...
 
 release: ## 完整发布构建（测试 + 前端 + 二进制）
-	./scripts/release.sh
+	bash ./scripts/release.sh
 
 clean: ## 清理构建产物
 	rm -rf dist mgate-cloud mgate-cloud.exe mgate-agent-sim mgate-agent-sim.exe

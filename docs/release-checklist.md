@@ -9,8 +9,11 @@
 - [ ] `gofmt -l` 无输出（格式整洁）
 - [ ] `npm --prefix web run build` 通过（含 `tsc` 类型检查）
 - [ ] `go build -o mgate-cloud ./cmd/mgate-cloud` 通过
-- [ ] `./scripts/build.sh` 生成 `dist/mgate-cloud`
-- [ ] `./scripts/release.sh` 生成多平台压缩包（tar.gz/zip）与 `SHA256SUMS`
+- [ ] `bash scripts/build.sh` 生成 `dist/mgate-cloud`
+- [ ] `bash scripts/release.sh` 生成多平台压缩包（tar.gz/zip）与 `SHA256SUMS`
+
+> 脚本统一通过 `bash scripts/xxx.sh` 调用，**不依赖文件可执行位**（git 中为 `100644`，CI 直接执行会 `Permission denied` / exit 126）。
+> 本地若想直接 `./scripts/xxx.sh`，可先 `chmod +x scripts/*.sh`；CI 与 Makefile 已统一用 `bash`，无需该执行位。
 
 ## 2. 安全边界
 

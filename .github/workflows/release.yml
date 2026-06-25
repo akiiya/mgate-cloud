@@ -49,7 +49,8 @@ jobs:
       # 以下步骤仅在 tag 不存在时执行。
       - name: Build & package (test + frontend + multi-platform archives)
         if: steps.ver.outputs.exists == 'false'
-        run: ./scripts/release.sh
+        # 用 bash 显式调用，避免依赖脚本的可执行位（git 中为 100644 时直接执行会 Permission denied / exit 126）。
+        run: bash ./scripts/release.sh
         env:
           VERSION: ${{ steps.ver.outputs.version }}
 

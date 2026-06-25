@@ -39,7 +39,7 @@ tar -xzf mgate-cloud_<版本>_linux_amd64.tar.gz
 ## 本地打包
 
 ```bash
-./scripts/release.sh            # 测试 + 前端 + 多平台压缩包 + SHA256SUMS（产出到 dist/）
+bash scripts/release.sh         # 测试 + 前端 + 多平台压缩包 + SHA256SUMS（产出到 dist/）
 ```
 
 > 本机无 `zip` 命令时会跳过 Windows zip（CI/Linux 会生成）。
