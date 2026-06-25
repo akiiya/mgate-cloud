@@ -1,0 +1,24 @@
+# ---- Go ----
+# 编译产物（单二进制）
+/mgate-cloud
+/mgate-cloud.exe
+/mgate-agent-sim
+/mgate-agent-sim.exe
+/dist/
+
+# ---- 运行期数据 ----
+/data/
+/backups/
+*.db
+*.db-shm
+*.db-wal
+
+# ---- 前端 ----
+/web/node_modules/
+# 前端构建产物：忽略全部，但保留 .gitkeep 以便 go:embed 始终可编译
+/web/dist/*
+!/web/dist/.gitkeep
+
+# ---- 杂项 ----
+.DS_Store
+*.log

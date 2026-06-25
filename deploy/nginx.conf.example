@@ -1,0 +1,43 @@
+# Nginx 反代示例 —— TLS 终结 + WebSocket 透传。
+# 证书可用 certbot 等签发；mgate-cloud 监听 127.0.0.1:8080。
+
+# WebSocket 升级所需的 Connection 头映射。
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name cloud.example.com;
+
+    ssl_certificate     /etc/ssl/cloud.example.com/fullchain.pem;
+    ssl_certificate_key /etc/ssl/cloud.example.com/privkey.pem;
+
+    # Pull 请求体上限与 mgate-cloud 的 MGATE_PULL_MAX_BODY_BYTES 协调（默认 128 KiB）。
+    client_max_body_size 256k;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        # WebSocket（/api/agent/ws）升级。
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        # 真实客户端 IP；mgate-cloud 需配合 MGATE_TRUST_PROXY_HEADERS=true。
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 空闲超时应大于心跳间隔（默认 25s），避免长连接被提前断开。
+        proxy_read_timeout 120s;
+    }
+}
+
+# 80 → 443 跳转。
+server {
+    listen 80;
+    server_name cloud.example.com;
+    return 301 https://$host$request_uri;
+}

@@ -1,0 +1,14 @@
+# Caddyfile 示例 —— Caddy 自动签发并续期 TLS，且原生支持 WebSocket 透传。
+#
+# 用法：caddy run --config deploy/Caddyfile.example
+# 将 cloud.example.com 替换为你的域名；mgate-cloud 监听 127.0.0.1:8080。
+
+cloud.example.com {
+	encode gzip
+
+	# 反代到本地 mgate-cloud；WebSocket（/api/agent/ws）由 Caddy 自动透传，无需额外配置。
+	reverse_proxy 127.0.0.1:8080 {
+		# 传递真实客户端 IP；mgate-cloud 需配合 MGATE_TRUST_PROXY_HEADERS=true。
+		header_up X-Forwarded-For {remote_host}
+	}
+}
