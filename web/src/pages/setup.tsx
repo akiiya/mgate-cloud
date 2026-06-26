@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ErrorAlert } from '@/components/ui/alert'
+import { Callout } from '@/components/ui/callout'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 /**
  * 首次初始化页面（无配置启动）。
@@ -88,17 +89,20 @@ export function SetupPage() {
   }
 
   return (
-    <div className="bg-grid flex min-h-full items-center justify-center px-4 py-12">
+    <div className="bg-aurora relative flex min-h-full items-center justify-center px-4 py-12">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-soft">
+          <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-soft">
             <Cloud className="h-6 w-6" aria-hidden />
           </span>
           <h1 className="text-2xl font-semibold tracking-tight">初始化 mgate-cloud</h1>
           <p className="mt-1 text-sm text-muted-foreground">首次启动，创建管理员并生成配置文件</p>
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-soft sm:p-7">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-soft sm:p-7">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="su-username">管理员用户名</Label>
@@ -165,7 +169,7 @@ export function SetupPage() {
               </div>
             )}
 
-            {error && <ErrorAlert message={error} />}
+            {error && <Callout tone="error">{error}</Callout>}
 
             <Button type="submit" loading={submitting} className="mt-1 w-full">
               {submitting ? '初始化中…' : '完成初始化'}

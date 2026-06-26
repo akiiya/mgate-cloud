@@ -10,7 +10,7 @@ export function NotFoundPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="bg-grid flex min-h-full flex-col items-center justify-center px-4 py-16 text-center">
+    <div className="bg-aurora flex min-h-full flex-col items-center justify-center px-4 py-16 text-center">
       <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <Compass className="h-6 w-6" aria-hidden />
       </span>
