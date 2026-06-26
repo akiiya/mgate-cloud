@@ -3,8 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
-    <title>mgate-cloud · 设备管理控制面</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>mgate-cloud · 云设备管理平台</title>
+    <!--
+      主题无闪烁：在 React 挂载前根据 localStorage / 系统偏好预先设置 .dark，
+      避免首屏先亮后暗的闪烁。与 lib/theme.tsx 的存储 key 保持一致。
+    -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('mgate-theme') || 'system'
+          var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var el = document.documentElement
+          el.classList.toggle('dark', dark)
+          el.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <!-- React 应用挂载点；其余 UI 全部由 SPA 渲染 -->

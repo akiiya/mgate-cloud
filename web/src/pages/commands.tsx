@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Terminal } from 'lucide-react'
-import { commandApi, type Command, type CommandStatus } from '@/api/commands'
+import { Terminal } from 'lucide-react'
+import { commandApi, type Command } from '@/api/commands'
 import { ApiError } from '@/api/client'
 import { commandStatusMeta } from '@/lib/command-status'
+import { actionTitle } from '@/lib/action-catalog'
 import { formatDateTime } from '@/lib/format'
+import { PageHeader } from '@/components/layout/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { ErrorAlert } from '@/components/ui/alert'
+import { Callout } from '@/components/ui/callout'
+import { EmptyState } from '@/components/ui/empty-state'
+import { SkeletonRows } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 
 /** 可筛选的状态选项。 */
 const statusOptions: { value: string; label: string }[] = [
   { value: '', label: '全部状态' },
-  { value: 'pending', label: '待投递' },
-  { value: 'sent', label: '已投递' },
-  { value: 'acked', label: '已确认' },
+  { value: 'pending', label: '进行中' },
   { value: 'succeeded', label: '成功' },
   { value: 'failed', label: '失败' },
   { value: 'timeout', label: '超时' },
@@ -49,66 +52,63 @@ export function CommandsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">命令记录</h1>
-          <p className="mt-1 text-sm text-muted-foreground">查看下发给设备的白名单命令及其执行结果。</p>
-        </div>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="h-9 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {statusOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <PageHeader
+        title="命令记录"
+        description="查看下发给设备的操作及其执行结果。"
+        actions={
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-9 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {statusOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        }
+      />
 
-      {error && <ErrorAlert message={error} />}
+      {error && <Callout tone="error" title="加载失败" action={<Button size="sm" variant="outline" onClick={() => void load()}>重试</Button>}>{error}</Callout>}
 
       <Card className="overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-          </div>
+          <SkeletonRows rows={6} cols={5} />
         ) : commands.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-              <Terminal className="h-6 w-6" aria-hidden />
-            </span>
-            <p className="text-sm text-muted-foreground">暂无命令记录</p>
-          </div>
+          <EmptyState
+            icon={Terminal}
+            title={status ? '没有该状态的命令' : '暂无命令记录'}
+            description={status ? '换个筛选条件试试。' : '在设备详情页下发操作后，这里会显示命令与执行结果。'}
+          />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-thin">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">设备</th>
-                  <th className="px-4 py-3 font-medium">操作</th>
-                  <th className="px-4 py-3 font-medium">状态</th>
-                  <th className="px-4 py-3 font-medium">创建时间</th>
-                  <th className="px-4 py-3 font-medium">完成时间</th>
+                  <th className="px-5 py-3 font-medium">操作</th>
+                  <th className="px-5 py-3 font-medium">设备</th>
+                  <th className="px-5 py-3 font-medium">状态</th>
+                  <th className="px-5 py-3 font-medium">创建时间</th>
+                  <th className="px-5 py-3 font-medium">完成时间</th>
                 </tr>
               </thead>
               <tbody>
                 {commands.map((c) => {
-                  const meta = commandStatusMeta(c.status as CommandStatus)
+                  const meta = commandStatusMeta(c.status)
                   return (
                     <tr
                       key={c.id}
                       onClick={() => navigate(`/commands/${c.id}`)}
-                      className="cursor-pointer border-b border-border/60 last:border-0 transition-colors hover:bg-muted/50"
+                      className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3">{c.device_name || c.device_id}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{c.action}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-5 py-3 font-medium">{actionTitle(c.action)}</td>
+                      <td className="px-5 py-3 text-muted-foreground">{c.device_name || c.device_id}</td>
+                      <td className="px-5 py-3">
                         <Badge tone={meta.tone}>{meta.label}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(c.created_at)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(c.finished_at)}</td>
+                      <td className="px-5 py-3 text-muted-foreground">{formatDateTime(c.created_at)}</td>
+                      <td className="px-5 py-3 text-muted-foreground">{formatDateTime(c.finished_at)}</td>
                     </tr>
                   )
                 })}
