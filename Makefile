@@ -1,9 +1,12 @@
 # mgate-cloud Makefile
 #
-# 常用目标：make help 查看全部。version 取自 VERSION 文件，经 ldflags 注入二进制。
+# 常用目标：make help 查看全部。version 由 git describe 派生（可用 VERSION=... 覆盖），经 ldflags 注入二进制。
 
 SHELL := /bin/bash
-VERSION := $(shell tr -d ' \t\n\r' < VERSION 2>/dev/null || echo dev)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
+ifeq ($(strip $(VERSION)),)
+VERSION := dev
+endif
 LDFLAGS := -s -w -X mgate-cloud/internal/version.Version=$(VERSION)
 BIN := dist/mgate-cloud
 

@@ -13,7 +13,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-$(tr -d ' \t\n\r' < VERSION)}"
+# 版本号优先取环境变量（CI Release 由 tag 注入）；否则用 git describe 派生（本地/dev 构建）。
+VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')}"
+VERSION="${VERSION:-dev}"
 LDFLAGS="-s -w -X mgate-cloud/internal/version.Version=${VERSION}"
 
 # 压缩包内附带的随附文件。
