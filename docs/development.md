@@ -16,6 +16,17 @@ docs/                文档
 scripts/             dev / build 脚本
 ```
 
+## 分支与协作流程 🌿
+
+> 重要：`main` 是受保护分支，请勿直接推送或改写其历史，避免误操作。
+
+- **`main`：受保护分支**，禁止 `force-push`，禁止直接 `git push`。
+- **日常开发在 `dev`**（或自 `dev` 切出的特性分支），所有改动先进 `dev`。
+- 合入 `main` **只通过 GitHub 页面的 PR / 手动 merge**，不在本地直接推 `main`。
+- `main` 合并后由 GitHub Actions **自动**：跑测试 → 按 `VERSION` 打 tag → 打包 → 发布 Release。
+- **不要在本地手动打正式版本 tag**（如 `vX.Y.Z`），除非文档另有明确说明——版本 tag 交由 `main` 的 workflow 自动创建，以免与远程冲突或重复发布。
+- 发布新版本：在 `dev` 更新 `VERSION` 与 `CHANGELOG.md`，经 PR 合并到 `main`，由 workflow 自动发版。
+
 ## 开发模式（推荐：前后端分离）
 
 后端与前端各起一个进程，互不干扰、独立重启。

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './app'
+import { ThemeProvider } from './lib/theme'
 import './styles/globals.css'
 
 // 应用挂载入口。index.html 中的 #root 是唯一挂载点。
@@ -11,6 +12,8 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 )

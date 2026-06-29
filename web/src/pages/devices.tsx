@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Plus, Router } from 'lucide-react'
+import { Plus, Router, Search } from 'lucide-react'
 import { deviceApi, type Device } from '@/api/devices'
 import { ApiError } from '@/api/client'
 import { deviceStatusMeta, connectionMeta } from '@/lib/device-status'
 import { formatDateTime } from '@/lib/format'
+import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
-import { ErrorAlert } from '@/components/ui/alert'
+import { Callout } from '@/components/ui/callout'
+import { EmptyState } from '@/components/ui/empty-state'
+import { SkeletonRows } from '@/components/ui/skeleton'
 
-/**
- * 设备列表页。
- * 展示设备及状态，支持通过弹窗创建设备；点击行进入设备详情。
- */
+/** 设备列表页：展示设备与连接态，支持创建设备并进入详情。 */
 export function DevicesPage() {
   const navigate = useNavigate()
 
@@ -24,6 +24,7 @@ export function DevicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [query, setQuery] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -42,30 +43,54 @@ export function DevicesPage() {
     void load()
   }, [load])
 
+  const filtered = devices.filter((d) => {
+    if (!query.trim()) return true
+    const q = query.trim().toLowerCase()
+    return d.name.toLowerCase().includes(q) || (d.remark ?? '').toLowerCase().includes(q) || d.id.toLowerCase().includes(q)
+  })
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">设备管理</h1>
-          <p className="mt-1 text-sm text-muted-foreground">创建设备并生成一次性设备码，供 agent 绑定。</p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" aria-hidden />
-          创建设备
-        </Button>
-      </div>
+      <PageHeader
+        title="设备"
+        description="创建设备并生成一次性设备码，供 agent 绑定。"
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" aria-hidden />
+            创建设备
+          </Button>
+        }
+      />
 
-      {error && <ErrorAlert message={error} />}
+      {error && <Callout tone="error" title="加载失败" action={<Button size="sm" variant="outline" onClick={() => void load()}>重试</Button>}>{error}</Callout>}
+
+      {/* 搜索：仅在有设备时显示 */}
+      {!loading && devices.length > 0 && (
+        <div className="relative max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索名称 / 备注 / ID" className="pl-9" />
+        </div>
+      )}
 
       <Card className="overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-          </div>
+          <SkeletonRows rows={5} cols={5} />
         ) : devices.length === 0 ? (
-          <EmptyState onCreate={() => setCreateOpen(true)} />
+          <EmptyState
+            icon={Router}
+            title="还没有任何设备"
+            description="创建设备后会生成一次性设备码，交给 mgate-agent 完成绑定。"
+            action={
+              <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" aria-hidden />
+                创建设备
+              </Button>
+            }
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={Search} title="没有匹配的设备" description="换个关键词试试。" />
         ) : (
-          <DeviceTable devices={devices} onRowClick={(id) => navigate(`/devices/${id}`)} />
+          <DeviceTable devices={filtered} onRowClick={(id) => navigate(`/devices/${id}`)} />
         )}
       </Card>
 
@@ -81,34 +106,18 @@ export function DevicesPage() {
   )
 }
 
-/** 空状态：引导创建第一台设备。 */
-function EmptyState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <Router className="h-6 w-6" aria-hidden />
-      </span>
-      <p className="text-sm text-muted-foreground">还没有任何设备</p>
-      <Button variant="outline" size="sm" onClick={onCreate}>
-        <Plus className="h-4 w-4" aria-hidden />
-        创建设备
-      </Button>
-    </div>
-  )
-}
-
 /** 设备表格。横向可滚动以适配窄屏。 */
 function DeviceTable({ devices, onRowClick }: { devices: Device[]; onRowClick: (id: string) => void }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto scrollbar-thin">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-            <th className="px-4 py-3 font-medium">名称</th>
-            <th className="px-4 py-3 font-medium">状态</th>
-            <th className="px-4 py-3 font-medium">连接</th>
-            <th className="px-4 py-3 font-medium">最近活跃</th>
-            <th className="px-4 py-3 font-medium">最近 Pull</th>
+            <th className="px-5 py-3 font-medium">名称</th>
+            <th className="px-5 py-3 font-medium">状态</th>
+            <th className="px-5 py-3 font-medium">连接</th>
+            <th className="px-5 py-3 font-medium">最近活跃</th>
+            <th className="px-5 py-3 font-medium">最近 Pull</th>
           </tr>
         </thead>
         <tbody>
@@ -119,23 +128,23 @@ function DeviceTable({ devices, onRowClick }: { devices: Device[]; onRowClick: (
               <tr
                 key={d.id}
                 onClick={() => onRowClick(d.id)}
-                className="cursor-pointer border-b border-border/60 last:border-0 transition-colors hover:bg-muted/50"
+                className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/50"
               >
-                <td className="px-4 py-3">
+                <td className="px-5 py-3">
                   <div className="font-medium text-foreground">{d.name}</div>
                   {d.remark && <div className="text-xs text-muted-foreground">{d.remark}</div>}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-5 py-3">
                   <Badge tone={meta.tone}>{meta.label}</Badge>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-5 py-3">
                   <span className="inline-flex items-center gap-1.5">
                     <span className={'h-1.5 w-1.5 rounded-full ' + conn.dotClass} aria-hidden />
                     <Badge tone={conn.tone}>{conn.label}</Badge>
                   </span>
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{formatDateTime(d.last_seen_at)}</td>
-                <td className="px-4 py-3 text-muted-foreground">{formatDateTime(d.last_pull_at)}</td>
+                <td className="px-5 py-3 text-muted-foreground">{formatDateTime(d.last_seen_at)}</td>
+                <td className="px-5 py-3 text-muted-foreground">{formatDateTime(d.last_pull_at)}</td>
               </tr>
             )
           })}
@@ -160,7 +169,6 @@ function CreateDeviceDialog({
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // 每次打开重置表单状态。
   useEffect(() => {
     if (open) {
       setName('')
@@ -184,7 +192,7 @@ function CreateDeviceDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="创建设备" description="创建后设备处于待绑定（pending）状态。">
+    <Dialog open={open} onClose={onClose} title="创建设备" description="创建后设备处于待绑定状态，需生成设备码并由 agent 绑定。">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="device-name">设备名称</Label>
@@ -199,15 +207,10 @@ function CreateDeviceDialog({
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="device-remark">备注（可选）</Label>
-          <Input
-            id="device-remark"
-            value={remark}
-            onChange={(e) => setRemark(e.target.value)}
-            placeholder="例如：测试设备"
-          />
+          <Input id="device-remark" value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="例如：测试设备" />
         </div>
 
-        {error && <ErrorAlert message={error} />}
+        {error && <Callout tone="error">{error}</Callout>}
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>

@@ -23,6 +23,7 @@ type routeDeps struct {
 	commands   *admin.CommandHandlers
 	setup      *admin.SetupHandlers
 	update     *admin.UpdateHandlers
+	system     *admin.SystemHandlers
 	agent      *agent.Handlers
 	ws         *agent.WSHandlers
 	pull       *agent.PullHandlers
@@ -81,6 +82,9 @@ func buildRoutes(d routeDeps) http.Handler {
 	// 更新：检查需登录；应用需登录 + CSRF。
 	apiMux.Handle("GET /api/admin/update/check", authed(d.update.Check))
 	apiMux.Handle("POST /api/admin/update/apply", authedWrite(d.update.Apply))
+
+	// 系统信息（只读）：版本 / 运行模式 / 更新通道，供「设置」页展示。
+	apiMux.Handle("GET /api/admin/system", authed(d.system.Info))
 
 	// 设备 agent 公开接口：enroll（无 session/CSRF）与 WebSocket 接入（bearer token 鉴权）。
 	apiMux.HandleFunc("POST /api/agent/enroll", d.agent.Enroll)

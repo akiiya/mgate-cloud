@@ -4,34 +4,76 @@
 
 /*
   设计令牌（design tokens）。
-  采用 HSL 通道分量存储，配合 Tailwind 的 hsl(var(--x)) 取色，
-  既能统一主题，也为后续深色模式预留扩展位（再加一组 .dark 变量即可）。
-  当前为现代浅色风格：石板灰背景 + 靛蓝主色。
+  以 HSL 通道分量存储，配合 Tailwind 的 hsl(var(--x)) 取色，提供 light / dark 两套，
+  由 ThemeProvider 在 <html> 切换 .dark。语义色（primary/success/warning/destructive/info）
+  全站统一，避免散落的硬编码颜色。
 */
 :root {
-  --background: 210 40% 98%;
+  --background: 220 24% 97%;
   --foreground: 222 47% 11%;
 
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
 
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 33% 20%;
+
+  --muted: 220 16% 95%;
+  --muted-foreground: 220 9% 46%;
+
+  --border: 220 14% 91%;
+  --input: 220 14% 88%;
+  --ring: 243 75% 59%;
+
   --primary: 243 75% 59%;
   --primary-foreground: 0 0% 100%;
 
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  --success: 142 70% 38%;
+  --success-foreground: 0 0% 100%;
 
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 243 75% 59%;
+  --warning: 32 95% 44%;
+  --warning-foreground: 0 0% 100%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 142 71% 45%;
-  --success-foreground: 0 0% 100%;
+  --info: 217 91% 55%;
+  --info-foreground: 0 0% 100%;
 
-  --radius: 0.75rem;
+  --radius: 0.7rem;
+}
+
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+
+  --card: 222 38% 11%;
+  --card-foreground: 210 40% 96%;
+
+  --sidebar: 222 45% 9%;
+  --sidebar-foreground: 214 32% 82%;
+
+  --muted: 222 28% 17%;
+  --muted-foreground: 217 16% 62%;
+
+  --border: 222 24% 20%;
+  --input: 222 24% 26%;
+  --ring: 243 80% 70%;
+
+  --primary: 243 80% 70%;
+  --primary-foreground: 222 47% 11%;
+
+  --success: 142 60% 50%;
+  --success-foreground: 222 47% 9%;
+
+  --warning: 36 92% 58%;
+  --warning-foreground: 222 47% 9%;
+
+  --destructive: 0 72% 60%;
+  --destructive-foreground: 222 47% 9%;
+
+  --info: 217 91% 68%;
+  --info-foreground: 222 47% 9%;
 }
 
 * {
@@ -44,6 +86,13 @@ body,
   height: 100%;
 }
 
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   background-color: hsl(var(--background));
@@ -53,9 +102,30 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 细腻的网格/光晕背景，提升登录等空旷页面的质感 */
-.bg-grid {
+/* 登录 / Setup 等空旷页面的细腻背景光晕，克制、不廉价。 */
+.bg-aurora {
   background-image:
-    radial-gradient(circle at 50% -20%, hsl(243 75% 59% / 0.10), transparent 60%),
-    linear-gradient(to bottom, hsl(210 40% 98%), hsl(210 40% 96%));
+    radial-gradient(60rem 30rem at 50% -10%, hsl(var(--primary) / 0.10), transparent 70%),
+    radial-gradient(40rem 24rem at 100% 0%, hsl(var(--info) / 0.06), transparent 60%);
+}
+
+/* 细网格背景，用于内容区分隔（极淡）。 */
+.bg-grid-faint {
+  background-image:
+    linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* 细滚动条，避免默认粗滚动条破坏质感。 */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 9999px;
 }

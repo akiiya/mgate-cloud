@@ -134,6 +134,13 @@ func New(cfg config.Config) (*App, error) {
 	commandHandlers := admin.NewCommandHandlers(commandService)
 	setupHandlers := admin.NewSetupHandlers(authService, auditService, &setupDone, cfg)
 	updateHandlers := admin.NewUpdateHandlers(updateService, auditService)
+	systemHandlers := admin.NewSystemHandlers(admin.SystemInfo{
+		Version:       version.Version,
+		Mode:          cfg.Mode,
+		UpdateChannel: cfg.UpdateChannel,
+		UpdateEnabled: cfg.UpdateCheckEnabled,
+		CookieSecure:  cfg.CookieSecure,
+	})
 	agentHandlers := agent.NewHandlers(deviceService, auditService)
 	wsHandlers := agent.NewWSHandlers(deviceService, commandService, auditService, connectionHub, cfg.WSHeartbeatInterval, cfg.WSOfflineAfter, cfg.WSMaxMessageBytes)
 	pullHandlers := agent.NewPullHandlers(deviceService, commandService, auditService, cfg.PullMaxBodyBytes, cfg.PullMaxCommands, cfg.PullDefaultInterval)
@@ -152,6 +159,7 @@ func New(cfg config.Config) (*App, error) {
 		commands:   commandHandlers,
 		setup:      setupHandlers,
 		update:     updateHandlers,
+		system:     systemHandlers,
 		agent:      agentHandlers,
 		ws:         wsHandlers,
 		pull:       pullHandlers,

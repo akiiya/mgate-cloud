@@ -9,6 +9,8 @@ import { DevicesPage } from '@/pages/devices'
 import { DeviceDetailPage } from '@/pages/device-detail'
 import { CommandsPage } from '@/pages/commands'
 import { CommandDetailPage } from '@/pages/command-detail'
+import { UpdatePage } from '@/pages/update'
+import { SettingsPage } from '@/pages/settings'
 import { SetupPage } from '@/pages/setup'
 import { NotFoundPage } from '@/pages/not-found'
 
@@ -95,6 +97,22 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <CommandDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/update"
+        element={
+          <ProtectedRoute>
+            <UpdatePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
           </ProtectedRoute>
         }
       />
