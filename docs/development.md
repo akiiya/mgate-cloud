@@ -23,9 +23,11 @@ scripts/             dev / build 脚本
 - **`main`：受保护分支**，禁止 `force-push`，禁止直接 `git push`。
 - **日常开发在 `dev`**（或自 `dev` 切出的特性分支），所有改动先进 `dev`。
 - 合入 `main` **只通过 GitHub 页面的 PR / 手动 merge**，不在本地直接推 `main`。
-- `main` 合并后由 GitHub Actions **自动**：跑测试 → 按 `VERSION` 打 tag → 打包 → 发布 Release。
-- **不要在本地手动打正式版本 tag**（如 `vX.Y.Z`），除非文档另有明确说明——版本 tag 交由 `main` 的 workflow 自动创建，以免与远程冲突或重复发布。
-- 发布新版本：在 `dev` 更新 `VERSION` 与 `CHANGELOG.md`，经 PR 合并到 `main`，由 workflow 自动发版。
+- **发布以 Git tag 为唯一来源**：把 `dev` 合并到 `main` 后，推送一个 `vX.Y.Z` tag 即触发发布
+  （命令行 `git tag v0.1.0 && git push origin v0.1.0`，或 GitHub「Draft a new release」新建 tag）。
+- 版本号 = tag 去掉 `v`，经 ldflags 注入二进制；**无 `VERSION` 文件**，日常构建版本由 `git describe` 派生。
+- Release workflow 自动：跑测试 → 构建多平台压缩包 → 发布 Release（发布说明由 GitHub 自动生成）。
+- tag 一旦发布对应 Release 即存在；如需重发同一版本可用 workflow_dispatch 重跑，或提升版本号新建 tag。
 
 ## 开发模式（推荐：前后端分离）
 

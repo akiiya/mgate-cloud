@@ -1,6 +1,6 @@
 # mgate-cloud ☁️
 
-公网部署的 **mgate 设备管理控制面**。当前版本 **v0.1.0-rc2**。
+公网部署的 **mgate 设备管理控制面**。版本信息见 [CHANGELOG.md](CHANGELOG.md) 与发布页。
 
 管理员经浏览器集中管理随身 WiFi 设备；设备上的 `mgate-agent` 主动连接 cloud
 （WebSocket 主通道 + HTTPS Pull 兜底），cloud 经**白名单 action** 下发指令并回收结果。

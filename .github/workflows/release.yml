@@ -1,11 +1,18 @@
 name: Release
 
-# main 合并后自动：测试 → 读取 VERSION → 若 tag 不存在则打 tag → 打包 → 发布。
-# 也支持手动 workflow_dispatch 重跑。
+# 发布以 Git tag 为唯一来源：
+#   - 推送一个 v* tag（命令行 `git tag v0.1.0 && git push origin v0.1.0`，
+#     或 GitHub「Draft a new release」新建 tag）即触发发布。
+#   - 版本号 = tag 去掉前缀 v，经 ldflags 注入二进制。
+#   - 无 VERSION 文件、无需手改文件；日常构建版本由 git describe 派生。
 on:
   push:
-    branches: [main]
-  workflow_dispatch: {}
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要重新构建发布的 tag（如 v0.1.0）"
+        required: true
 
 permissions:
   contents: write
@@ -16,7 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 需要完整历史与标签以判断 tag 是否已存在
+          fetch-depth: 0 # 完整历史 + tag
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -31,44 +39,26 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # 读取版本并判断对应 tag 是否已存在（存在则跳过发布，绝不覆盖）。
+      # 从 tag 解析版本号（去掉前缀 v）。
       - name: Resolve version
         id: ver
         run: |
-          VERSION="$(tr -d ' \t\n\r' < VERSION)"
-          TAG="v${VERSION}"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "${TAG}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::tag ${TAG} 已存在，跳过发布（不覆盖已有 tag/release）"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      # 以下步骤仅在 tag 不存在时执行。
       - name: Build & package (test + frontend + multi-platform archives)
-        if: steps.ver.outputs.exists == 'false'
-        # 用 bash 显式调用，避免依赖脚本的可执行位（git 中为 100644 时直接执行会 Permission denied / exit 126）。
         run: bash ./scripts/release.sh
         env:
           VERSION: ${{ steps.ver.outputs.version }}
 
-      - name: Create and push tag
-        if: steps.ver.outputs.exists == 'false'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.ver.outputs.tag }}"
-          git push origin "${{ steps.ver.outputs.tag }}"
-
+      # 发布 Release：发布说明由 GitHub 依据提交/PR 自动生成（无需维护 CHANGELOG）。
       - name: Publish GitHub Release
-        if: steps.ver.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
-          body_path: CHANGELOG.md
+          generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
             dist/mgate-cloud_*.tar.gz

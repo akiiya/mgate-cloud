@@ -13,8 +13,10 @@ set -euo pipefail
 # 切到仓库根目录，保证相对路径稳定。
 cd "$(dirname "$0")/.."
 
-# 版本号取自 VERSION 文件，经 ldflags 注入二进制（启动日志可见）。
-VERSION="$(tr -d ' \t\n\r' < VERSION 2>/dev/null || echo dev)"
+# 版本号由 git describe 派生（无 VERSION 文件），经 ldflags 注入二进制（启动日志可见）；
+# 也可用环境变量 VERSION 覆盖。无 tag 时回退 dev。
+VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')}"
+VERSION="${VERSION:-dev}"
 LDFLAGS="-s -w -X mgate-cloud/internal/version.Version=${VERSION}"
 
 echo "==> [1/3] 安装前端依赖"

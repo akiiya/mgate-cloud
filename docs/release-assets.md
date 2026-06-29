@@ -49,19 +49,18 @@ bash scripts/release.sh         # 测试 + 前端 + 多平台压缩包 + SHA256S
 `main` 分支已锁定，发布候选后所有开发在 `dev` 分支进行，经 PR/手动 merge 进入 `main`。
 
 - **dev / PR**：触发 `CI` workflow —— `go vet`、`go test`（含静态安全测试）、前端构建、`go build`。**不发布**。
-- **main**：触发 `Release` workflow ——
-  1. 跑 CI（测试 + 前端）。
-  2. 读取 `VERSION`。
-  3. 若 `v<VERSION>` tag **不存在**：打包多平台压缩包 → 创建并推送 tag → 发布 Release（附压缩包 + `SHA256SUMS`，release notes 取 `CHANGELOG.md`）。
-  4. 若 tag **已存在**：跳过发布，**绝不覆盖**已有 tag/release。
-- 支持 `workflow_dispatch` 手动重跑 Release。
+- **推送 `v*` tag**：触发 `Release` workflow（**以 tag 为唯一来源**）——
+  1. 从 tag 解析版本号（去掉前缀 `v`），经 ldflags 注入二进制。
+  2. 跑测试 + 构建前端 → 多平台打包压缩包 + `SHA256SUMS`。
+  3. 创建 GitHub Release，附压缩包与校验和；发布说明由 GitHub 依据提交/PR 自动生成。
+- 支持 `workflow_dispatch` 指定某个 tag 手动重跑。
 
-### 发布新版本的步骤
+### 发布新版本的步骤（无 VERSION 文件，无需手改版本号）
 
 1. 在 `dev` 完成开发与验证。
-2. 更新 `VERSION` 与 `CHANGELOG.md`（新增对应版本条目）。
-3. 通过 GitHub 页面把 `dev` 合并到 `main`。
-4. `main` 的 Release workflow 自动打 tag 并发布。
+2. 通过 GitHub 页面把 `dev` 合并到 `main`。
+3. 在 `main` 打 tag 触发发布：`git tag v0.1.0 && git push origin v0.1.0`，
+   或在 GitHub「Draft a new release」里直接新建 tag 并发布。
 
-> 注意：升级版本号前确认 `VERSION` 与 `CHANGELOG.md` 一致；tag 一旦发布不可覆盖，
-> 如需重发请提升版本号。
+> 版本号在打 tag 时一次决定（语义化版本）；日常/本地构建版本由 `git describe` 自动派生。
+> 同一版本 tag 的 Release 已存在；如需重发请用 workflow_dispatch 重跑或新建更高版本 tag。
