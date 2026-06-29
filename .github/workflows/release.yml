@@ -52,13 +52,15 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
 
-      # 发布 Release：发布说明由 GitHub 依据提交/PR 自动生成（无需维护 CHANGELOG）。
+      # 发布 Release：自动生成发布说明并“追加”到已有正文之后。
+      # append_body=true 使手动在 release 里写的内容不被覆盖，自动说明追加在其下方。
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
           generate_release_notes: true
+          append_body: true
           fail_on_unmatched_files: true
           files: |
             dist/mgate-cloud_*.tar.gz
