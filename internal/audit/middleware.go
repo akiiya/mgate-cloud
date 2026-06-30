@@ -2,8 +2,10 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"strings"
 
 	"mgate-cloud/internal/util"
 )
@@ -53,13 +55,16 @@ func ClientIP(r *http.Request) string {
 
 // RealIP 中间件按可信代理策略计算客户端 IP 并注入 context。
 //
-// 安全要点：只有 trustProxy=true（确实部署于可信反代之后）时才采纳请求头中的来源 IP，
-// 否则任何客户端都能伪造 X-Forwarded-For / CF-Connecting-IP 来污染审计。
-// 信任时优先 CF-Connecting-IP（Cloudflare 单值，不可被客户端追加），其次 X-Forwarded-For 首段。
-func RealIP(trustProxy bool) func(http.Handler) http.Handler {
+// 安全要点：仅当“直接对端”（RemoteAddr）本身是可信代理时，才采信其转发头里的来源 IP；
+// 否则（公网直连客户端）一律以对端地址为准，杜绝客户端伪造 X-Forwarded-For / CF-Connecting-IP。
+// 这对登录失败限流尤其重要：必须按“真实客户端 IP”封禁，而不是把所有人归并到反代的 IP。
+//
+//   - trusted：可信代理网段（默认本地回环 + 私有/链路本地，可经 MGATE_TRUSTED_PROXIES 追加）。
+//   - blanket：兼容旧 MGATE_TRUST_PROXY_HEADERS=true 的“无条件信任任意对端转发头”行为。
+func RealIP(trusted []*net.IPNet, blanket bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := resolveClientIP(r, trustProxy)
+			ip := resolveClientIP(r, trusted, blanket)
 			ctx := context.WithValue(r.Context(), clientIPKey, ip)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -67,20 +72,30 @@ func RealIP(trustProxy bool) func(http.Handler) http.Handler {
 }
 
 // resolveClientIP 依据可信代理策略计算客户端 IP。
-func resolveClientIP(r *http.Request, trustProxy bool) string {
-	if trustProxy {
-		if cf := trimSpace(r.Header.Get("CF-Connecting-IP")); cf != "" {
+func resolveClientIP(r *http.Request, trusted []*net.IPNet, blanket bool) string {
+	peer := remoteAddrIP(r)
+	// 只有“对端是可信代理”或开启 blanket 时，才从转发头还原真实客户端。
+	if blanket || ipInNets(peer, trusted) {
+		// Cloudflare 单值头，不可被客户端追加，优先采用。
+		if cf := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); cf != "" {
 			return cf
 		}
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			// "client, proxy1, proxy2"，取第一段（最初客户端）。
-			if comma := indexByte(xff, ','); comma >= 0 {
-				return trimSpace(xff[:comma])
+			parts := strings.Split(xff, ",")
+			// 从右向左取第一个“非可信代理”的地址：最接近可信边界、最难被客户端伪造。
+			for i := len(parts) - 1; i >= 0; i-- {
+				c := strings.TrimSpace(parts[i])
+				if c != "" && !ipInNets(c, trusted) {
+					return c
+				}
 			}
-			return trimSpace(xff)
+			// 链路上全是可信代理：退回最左（最初客户端）。
+			if first := strings.TrimSpace(parts[0]); first != "" {
+				return first
+			}
 		}
 	}
-	return remoteAddrIP(r)
+	return peer
 }
 
 // remoteAddrIP 从 RemoteAddr 剥离端口，得到对端 IP。
@@ -91,23 +106,68 @@ func remoteAddrIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// 以下两个小工具避免为简单操作引入 strings 包，保持本文件聚焦。
-func indexByte(s string, b byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == b {
-			return i
+// ipInNets 报告 ip 是否落在任一网段内。
+func ipInNets(ip string, nets []*net.IPNet) bool {
+	parsed := net.ParseIP(strings.TrimSpace(ip))
+	if parsed == nil {
+		return false
+	}
+	for _, n := range nets {
+		if n != nil && n.Contains(parsed) {
+			return true
 		}
 	}
-	return -1
+	return false
 }
 
-func trimSpace(s string) string {
-	start, end := 0, len(s)
-	for start < end && s[start] == ' ' {
-		start++
+// DefaultTrustedProxies 返回默认可信代理网段：本地回环 + 私有 / 链路本地地址。
+//
+// 这些地址不可能来自公网直连，因此采信来自它们的转发头是安全的；
+// 同时让“反代（Caddy/Nginx/Docker 网络）”部署开箱即用——无需手工配置即可识别真实客户端 IP。
+func DefaultTrustedProxies() []*net.IPNet {
+	cidrs := []string{
+		"127.0.0.0/8", "::1/128", // 回环
+		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", // RFC1918 私有
+		"169.254.0.0/16", "fe80::/10", // 链路本地
+		"fc00::/7", // IPv6 唯一本地地址（ULA）
 	}
-	for end > start && s[end-1] == ' ' {
-		end--
+	out := make([]*net.IPNet, 0, len(cidrs))
+	for _, c := range cidrs {
+		if _, n, err := net.ParseCIDR(c); err == nil {
+			out = append(out, n)
+		}
 	}
-	return s[start:end]
+	return out
+}
+
+// ParseTrustedProxies 解析逗号分隔的 CIDR / IP 列表为网段集合。
+//
+// 裸 IP 视为 /32（IPv4）或 /128（IPv6）。空串、或特殊值 "none"/"off" 返回空集合。
+func ParseTrustedProxies(list string) ([]*net.IPNet, error) {
+	list = strings.TrimSpace(list)
+	if list == "" || strings.EqualFold(list, "none") || strings.EqualFold(list, "off") {
+		return nil, nil
+	}
+	var out []*net.IPNet
+	for _, item := range strings.Split(list, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if !strings.Contains(item, "/") {
+			if ip := net.ParseIP(item); ip != nil {
+				if ip.To4() != nil {
+					item += "/32"
+				} else {
+					item += "/128"
+				}
+			}
+		}
+		_, n, err := net.ParseCIDR(item)
+		if err != nil {
+			return nil, fmt.Errorf("audit: 无效的可信代理项 %q: %w", item, err)
+		}
+		out = append(out, n)
+	}
+	return out, nil
 }

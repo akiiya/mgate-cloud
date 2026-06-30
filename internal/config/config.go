@@ -26,10 +26,14 @@ type Config struct {
 	// CookieSecure 控制下发的 cookie 是否带 Secure 属性。
 	// 本地 http 开发置 false；公网 https（经 Cloudflare）部署务必置 true。
 	CookieSecure bool
-	// TrustProxyHeaders 控制是否信任反代下发的客户端 IP 头
-	// （CF-Connecting-IP / X-Forwarded-For）。仅在确实部署于可信反代之后时才置 true，
-	// 否则客户端可伪造来源 IP。默认 false，仅用 RemoteAddr。
+	// TrustProxyHeaders 为兼容旧行为的“无条件信任任意对端转发头”开关（blanket）。
+	// 一般无需开启：默认即会信任来自本地回环/私有网段（典型反代位置）的转发头，
+	// 见 TrustedProxies。仅在反代位于非私有地址且无法用 TrustedProxies 表达时才置 true。
 	TrustProxyHeaders bool
+	// TrustedProxies 是额外可信代理网段（逗号分隔的 CIDR / IP），追加到默认的
+	// 本地回环 + 私有网段之上；用于反代处于公网地址（如自建公网反代、特定 CDN 段）的场景。
+	// 特殊值 "none"/"off" 表示谁都不信任（仅用 RemoteAddr，适用于程序直接暴露公网且无反代）。
+	TrustedProxies string
 
 	// AdminUsername / AdminPassword 用于首次启动时 bootstrap 管理员。
 	// 仅在系统中尚无任何管理员时生效，且明文口令绝不写入日志。
@@ -125,13 +129,14 @@ type Config struct {
 
 // 各配置项对应的环境变量名，集中声明便于文档与代码一致。
 const (
-	envConfigPath   = "MGATE_CONFIG"
-	envMode         = "MGATE_MODE"
-	envTrustProxy   = "MGATE_TRUST_PROXY_HEADERS"
-	envHTTPAddr     = "MGATE_HTTP_ADDR"
-	envDBPath       = "MGATE_DB_PATH"
-	envBaseURL      = "MGATE_BASE_URL"
-	envCookieSecure = "MGATE_COOKIE_SECURE"
+	envConfigPath     = "MGATE_CONFIG"
+	envMode           = "MGATE_MODE"
+	envTrustProxy     = "MGATE_TRUST_PROXY_HEADERS"
+	envTrustedProxies = "MGATE_TRUSTED_PROXIES"
+	envHTTPAddr       = "MGATE_HTTP_ADDR"
+	envDBPath         = "MGATE_DB_PATH"
+	envBaseURL        = "MGATE_BASE_URL"
+	envCookieSecure   = "MGATE_COOKIE_SECURE"
 
 	envUpdateEnabled     = "MGATE_UPDATE_CHECK_ENABLED"
 	envUpdateChannel     = "MGATE_UPDATE_CHANNEL"
@@ -248,6 +253,7 @@ func loadInternal(fc *FileConfig) Config {
 		BaseURL:           pickStr(envBaseURL, fc.BaseURL, "http://127.0.0.1:8080"),
 		CookieSecure:      pickBool(envCookieSecure, fc.CookieSecure, false),
 		TrustProxyHeaders: pickBool(envTrustProxy, fc.TrustProxyHeaders, false),
+		TrustedProxies:    envString(envTrustedProxies, ""),
 		AdminUsername:     pickStr(envAdminUsername, fc.AdminUsername, ""),
 		AdminPassword:     pickStr(envAdminPassword, fc.AdminPassword, ""),
 		AdminPasswordHash: fc.AdminPasswordHash,

@@ -167,20 +167,35 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("app: 加载内嵌前端资源失败: %w", err)
 	}
 
+	// 可信代理网段：默认本地回环 + 私有网段（典型反代位置），再追加用户配置的额外网段。
+	// 据此从 X-Forwarded-For 还原真实客户端 IP（登录失败限流按真实 IP 封禁，避免误伤反代后全体）。
+	trustedProxies := audit.DefaultTrustedProxies()
+	if extra, perr := audit.ParseTrustedProxies(cfg.TrustedProxies); perr != nil {
+		log.Printf("app: 解析 MGATE_TRUSTED_PROXIES 失败，忽略额外项: %v", perr)
+	} else if extra != nil {
+		// "none"/"off" 时 ParseTrustedProxies 返回 nil；但此时用户意图是“谁都不信任”，
+		// 需清空默认集合，故下面单独处理该意图。
+		trustedProxies = append(trustedProxies, extra...)
+	}
+	if isTrustNone(cfg.TrustedProxies) {
+		trustedProxies = nil
+	}
+
 	handler := buildRoutes(routeDeps{
-		auth:       handlers,
-		devices:    deviceHandlers,
-		commands:   commandHandlers,
-		setup:      setupHandlers,
-		update:     updateHandlers,
-		system:     systemHandlers,
-		agent:      agentHandlers,
-		ws:         wsHandlers,
-		pull:       pullHandlers,
-		authSvc:    authService,
-		distFS:     distFS,
-		trustProxy: cfg.TrustProxyHeaders,
-		setupDone:  &setupDone,
+		auth:           handlers,
+		devices:        deviceHandlers,
+		commands:       commandHandlers,
+		setup:          setupHandlers,
+		update:         updateHandlers,
+		system:         systemHandlers,
+		agent:          agentHandlers,
+		ws:             wsHandlers,
+		pull:           pullHandlers,
+		authSvc:        authService,
+		distFS:         distFS,
+		trustedProxies: trustedProxies,
+		trustBlanket:   cfg.TrustProxyHeaders,
+		setupDone:      &setupDone,
 		// 就绪探测：数据库可 Ping 即视为就绪。
 		readyCheck: func(ctx context.Context) error { return database.PingContext(ctx) },
 	})
@@ -201,6 +216,12 @@ func deviceSettings(cfg config.Config) device.Settings {
 		WSURL:             toWebSocketScheme(cfg.BaseURL) + "/api/agent/ws",
 		PullURL:           cfg.BaseURL + "/api/agent/pull",
 	}
+}
+
+// isTrustNone 报告用户是否显式要求“不信任任何代理”（仅用 RemoteAddr）。
+func isTrustNone(v string) bool {
+	v = strings.TrimSpace(v)
+	return strings.EqualFold(v, "none") || strings.EqualFold(v, "off")
 }
 
 // toWebSocketScheme 把 http(s) 基础地址转换为 ws(s) 方案。
