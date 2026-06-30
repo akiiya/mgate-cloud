@@ -47,6 +47,21 @@ type Config struct {
 	// SessionTTL 是会话有效期。
 	SessionTTL time.Duration
 
+	// --- 登录失败限流（在线暴力破解防护）---
+
+	// LoginThrottleEnabled 是否启用按 IP 的登录失败限流。
+	LoginThrottleEnabled bool
+	// LoginMaxFailures 触发封禁的窗口内连续失败次数阈值。
+	LoginMaxFailures int
+	// LoginFailureWindow 连续失败的计数窗口，超过则重置连续计数。
+	LoginFailureWindow time.Duration
+	// LoginBanBase 首次封禁时长；后续每次封禁按等级翻倍升级。
+	LoginBanBase time.Duration
+	// LoginBanMax 封禁时长上限。
+	LoginBanMax time.Duration
+	// LoginBanOffenseReset 距上次失败超过该时长后，封禁等级衰减归零。
+	LoginBanOffenseReset time.Duration
+
 	// --- Phase 7：更新检查 / 自更新 ---
 
 	// UpdateCheckEnabled 控制是否允许检查更新。
@@ -132,6 +147,18 @@ const (
 	envAdminPassword    = "MGATE_ADMIN_PASSWORD"
 	envSessionTTLHours  = "MGATE_SESSION_TTL_HOURS"
 	defaultSessionHours = 168 // 7 天
+
+	envLoginThrottleEnabled = "MGATE_LOGIN_THROTTLE_ENABLED"
+	envLoginMaxFailures     = "MGATE_LOGIN_MAX_FAILURES"
+	envLoginWindowMinutes   = "MGATE_LOGIN_FAILURE_WINDOW_MINUTES"
+	envLoginBanBaseMinutes  = "MGATE_LOGIN_BAN_BASE_MINUTES"
+	envLoginBanMaxHours     = "MGATE_LOGIN_BAN_MAX_HOURS"
+	envLoginBanResetHours   = "MGATE_LOGIN_BAN_RESET_HOURS"
+	defaultLoginMaxFailures = 5
+	defaultLoginWindowMin   = 15
+	defaultLoginBanBaseMin  = 60 // 首次封禁 1 小时
+	defaultLoginBanMaxHours = 24 // 封禁上限 24 小时
+	defaultLoginBanResetH   = 24 // 24 小时无失败后封禁等级归零
 
 	envPairingTTLMinutes  = "MGATE_PAIRING_TTL_MINUTES"
 	envDeviceTokenBytes   = "MGATE_DEVICE_TOKEN_BYTES"
@@ -225,6 +252,13 @@ func loadInternal(fc *FileConfig) Config {
 		AdminPassword:     pickStr(envAdminPassword, fc.AdminPassword, ""),
 		AdminPasswordHash: fc.AdminPasswordHash,
 		SessionTTL:        time.Duration(envInt(envSessionTTLHours, defaultSessionHours)) * time.Hour,
+
+		LoginThrottleEnabled: pickBool(envLoginThrottleEnabled, nil, true),
+		LoginMaxFailures:     max(envInt(envLoginMaxFailures, defaultLoginMaxFailures), 1),
+		LoginFailureWindow:   time.Duration(envInt(envLoginWindowMinutes, defaultLoginWindowMin)) * time.Minute,
+		LoginBanBase:         time.Duration(envInt(envLoginBanBaseMinutes, defaultLoginBanBaseMin)) * time.Minute,
+		LoginBanMax:          time.Duration(envInt(envLoginBanMaxHours, defaultLoginBanMaxHours)) * time.Hour,
+		LoginBanOffenseReset: time.Duration(envInt(envLoginBanResetHours, defaultLoginBanResetH)) * time.Hour,
 
 		UpdateCheckEnabled: pickBool(envUpdateEnabled, fc.UpdateCheckEnabled, true),
 		UpdateChannel:      pickStr(envUpdateChannel, fc.UpdateChannel, defaultUpdateChannel),

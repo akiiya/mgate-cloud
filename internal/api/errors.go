@@ -25,6 +25,7 @@ func (e *Error) Status() int { return e.httpStatus }
 // 与"密码错误"，避免账户枚举攻击。内部错误一律以 ErrInternal 对外，不泄露细节。
 var (
 	ErrInvalidCredentials = &Error{Code: "invalid_credentials", Message: "用户名或密码错误", httpStatus: http.StatusUnauthorized}
+	ErrTooManyAttempts    = &Error{Code: "too_many_attempts", Message: "登录失败次数过多，该来源已被临时封禁，请稍后再试", httpStatus: http.StatusTooManyRequests}
 	ErrUnauthorized       = &Error{Code: "unauthorized", Message: "未登录或会话已失效", httpStatus: http.StatusUnauthorized}
 	ErrCSRF               = &Error{Code: "csrf_failed", Message: "CSRF 校验失败", httpStatus: http.StatusForbidden}
 	ErrBadRequest         = &Error{Code: "bad_request", Message: "请求参数无效", httpStatus: http.StatusBadRequest}

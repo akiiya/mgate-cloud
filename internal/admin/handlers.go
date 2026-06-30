@@ -2,7 +2,9 @@ package admin
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,15 +18,17 @@ import (
 type Handlers struct {
 	auth         *auth.Service
 	audit        *audit.Service
+	throttle     *auth.LoginThrottle
 	cookieSecure bool
 	sessionTTL   time.Duration
 }
 
 // NewHandlers 构造 Handlers，显式注入依赖，避免全局状态。
-func NewHandlers(authService *auth.Service, auditService *audit.Service, cookieSecure bool, sessionTTL time.Duration) *Handlers {
+func NewHandlers(authService *auth.Service, auditService *audit.Service, throttle *auth.LoginThrottle, cookieSecure bool, sessionTTL time.Duration) *Handlers {
 	return &Handlers{
 		auth:         authService,
 		audit:        auditService,
+		throttle:     throttle,
 		cookieSecure: cookieSecure,
 		sessionTTL:   sessionTTL,
 	}
@@ -71,6 +75,28 @@ func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
 // 成功：下发会话 cookie，记录 admin.login.success；
 // 失败：返回统一凭据错误（不区分用户名/口令），记录 admin.login.failed。
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
+	ip := audit.ClientIP(r)
+	userAgent := r.UserAgent()
+	requestID := audit.RequestIDFrom(r.Context())
+
+	// 失败限流前置：被封禁的来源 IP 在校验凭据（含 bcrypt）之前即被拦截，
+	// 既阻断在线暴力破解，也避免为已封禁来源浪费 CPU。
+	if allowed, retryAfter := h.throttle.Allow(r.Context(), ip); !allowed {
+		secs := int(math.Ceil(retryAfter.Seconds()))
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		h.audit.Record(r.Context(), audit.Entry{
+			ActorType: model.ActorTypeAdmin,
+			Action:    model.ActionLoginBlocked,
+			IP:        ip,
+			UserAgent: userAgent,
+			RequestID: requestID,
+			Summary:   "登录被失败限流拦截",
+			Metadata:  map[string]any{"retry_after_seconds": secs},
+		})
+		api.WriteError(w, api.ErrTooManyAttempts)
+		return
+	}
+
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		api.WriteError(w, api.ErrBadRequest)
@@ -82,12 +108,14 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := audit.ClientIP(r)
-	userAgent := r.UserAgent()
-	requestID := audit.RequestIDFrom(r.Context())
-
 	token, admin, err := h.auth.Login(r.Context(), req.Username, req.Password, userAgent, ip)
 	if err != nil {
+		// 记录失败到限流器；触发封禁则补充审计元数据（仍对外返回统一凭据错误）。
+		banned, banFor := h.throttle.RecordFailure(r.Context(), ip)
+		meta := map[string]any{"username": req.Username}
+		if banned {
+			meta["banned_for_seconds"] = int(banFor.Seconds())
+		}
 		// 登录失败审计：actor_id 留空（主体未确认），用户名入 metadata（非敏感）。
 		h.audit.Record(r.Context(), audit.Entry{
 			ActorType: model.ActorTypeAdmin,
@@ -96,12 +124,14 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 			UserAgent: userAgent,
 			RequestID: requestID,
 			Summary:   "管理员登录失败",
-			Metadata:  map[string]any{"username": req.Username},
+			Metadata:  meta,
 		})
 		api.WriteError(w, err)
 		return
 	}
 
+	// 成功登录：清除该 IP 的失败/封禁记录。
+	h.throttle.RecordSuccess(r.Context(), ip)
 	h.setSessionCookie(w, token)
 	h.audit.Record(r.Context(), audit.Entry{
 		ActorType: model.ActorTypeAdmin,
