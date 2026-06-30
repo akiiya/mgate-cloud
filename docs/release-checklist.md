@@ -24,10 +24,10 @@
 
 ## 3. 版本与产物
 
-- [ ] 版本号**无需手改文件**：以 Git tag 为唯一来源（无 `VERSION` 文件），版本 = tag 去掉 `v`
-- [ ] 二进制启动日志显示正确版本（`mgate-cloud <version> 启动...`；版本经 git describe / tag 注入）
+- [ ] 二进制启动日志显示正确版本（`mgate-cloud <version> 启动...`；版本来自 git tag / `git describe`）
 - [ ] 最终二进制内嵌前端：删除源码 `web/dist` 后已编译二进制仍能提供页面
-- [ ] Release 资产为压缩包（`*_linux_amd64.tar.gz` / `*_linux_arm64.tar.gz` / `*_windows_amd64.zip`），`SHA256SUMS` 对压缩包计算
+
+> 版本号机制（无 `VERSION` 文件、tag 为唯一来源）见 [releasing.md](releasing.md)；资产格式见 [release-assets.md](release-assets.md)。
 
 ## 3.5 首次初始化（Setup）
 
@@ -53,13 +53,10 @@
 - [ ] agent 可经 WS 连接、可经 Pull 兜底
 - [ ] 命令可下发并回收结果
 
-## 6. 发布（dev → main → 打 tag）
+## 6. 发布
 
-- [ ] 所有改动在 `dev` 分支完成并通过 CI
-- [ ] 通过 GitHub 页面将 `dev` 合并到 `main`（main 已锁定，不直接推送）
-- [ ] 在 `main` 推送一个 `vX.Y.Z` tag 触发发布：
-      `git tag v0.1.0 && git push origin v0.1.0`，或 GitHub「Draft a new release」新建 tag
-- [ ] Release workflow 自动：跑测试 → 多平台打包 → 发布 Release（附压缩包 + `SHA256SUMS`，发布说明自动生成）
+- [ ] 所有改动在 `dev` 通过 CI，并经 PR 合并到 `main`
+- [ ] 按 [releasing.md](releasing.md) 打 `vX.Y.Z` tag 触发发布（rc/beta 记得标 pre-release）
 - [ ] 校验 Release 产物 `SHA256SUMS`
 
-> 同一 tag 的 Release 已存在；如需重新构建可用 workflow_dispatch 指定 tag 重跑，或新建更高版本 tag。
+> 完整发版步骤（打 tag、Release Notes、重跑等）见 [releasing.md](releasing.md)。
