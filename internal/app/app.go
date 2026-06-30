@@ -129,7 +129,21 @@ func New(cfg config.Config) (*App, error) {
 	// 更新服务（Phase 7）：来源 GitHub Releases，按当前版本与配置判断。
 	updateService := update.NewService(cfg.GitHubRepo, cfg.UpdateChannel, version.Version, cfg.UpdateCheckEnabled)
 
-	handlers := admin.NewHandlers(authService, auditService, cfg.CookieSecure, cfg.SessionTTL)
+	// 登录失败限流（按 IP 封禁，失败越多封禁越久）。
+	loginThrottle := auth.NewLoginThrottle(
+		auth.NewLoginThrottleStore(database, clock),
+		clock,
+		auth.ThrottleSettings{
+			Enabled:       cfg.LoginThrottleEnabled,
+			MaxFailures:   cfg.LoginMaxFailures,
+			FailureWindow: cfg.LoginFailureWindow,
+			BaseBan:       cfg.LoginBanBase,
+			MaxBan:        cfg.LoginBanMax,
+			OffenseReset:  cfg.LoginBanOffenseReset,
+		},
+	)
+
+	handlers := admin.NewHandlers(authService, auditService, loginThrottle, cfg.CookieSecure, cfg.SessionTTL)
 	deviceHandlers := admin.NewDeviceHandlers(deviceService, auditService)
 	commandHandlers := admin.NewCommandHandlers(commandService)
 	setupHandlers := admin.NewSetupHandlers(authService, auditService, &setupDone, cfg)

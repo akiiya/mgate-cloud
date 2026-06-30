@@ -116,14 +116,17 @@ func NewService(admins *AdminStore, sessions *SessionStore, sessionTTL time.Dura
 func (s *Service) Login(ctx context.Context, username, password, userAgent, ip string) (rawToken string, admin model.Admin, err error) {
 	admin, err = s.admins.FindByUsername(ctx, username)
 	if errors.Is(err, errAdminNotFound) {
+		// 计时对齐：用户名不存在时也消耗一次等价的 bcrypt 时间，避免据响应耗时枚举有效用户名。
+		DummyVerify(password)
 		return "", model.Admin{}, api.ErrInvalidCredentials
 	}
 	if err != nil {
 		return "", model.Admin{}, err
 	}
 
-	// 账户被禁用同样返回统一凭据错误，不暴露账户状态。
+	// 账户被禁用同样返回统一凭据错误，不暴露账户状态；同样做计时对齐。
 	if !admin.IsEnabled() {
+		DummyVerify(password)
 		return "", model.Admin{}, api.ErrInvalidCredentials
 	}
 

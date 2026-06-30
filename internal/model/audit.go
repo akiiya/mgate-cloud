@@ -20,6 +20,7 @@ const (
 const (
 	ActionLoginSuccess          = "admin.login.success"
 	ActionLoginFailed           = "admin.login.failed"
+	ActionLoginBlocked          = "admin.login.blocked" // 登录被失败限流（IP 封禁）拦截
 	ActionLogout                = "admin.logout"
 	ActionBootstrapAdminCreated = "system.bootstrap_admin.created"
 	ActionSetupCompleted        = "system.setup.completed"
