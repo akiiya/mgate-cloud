@@ -25,7 +25,6 @@ export function SetupPage() {
   const [baseURL, setBaseURL] = useState('')
   const [httpAddr, setHTTPAddr] = useState(':8080')
   const [dbPath, setDBPath] = useState('./data/mgate-cloud.db')
-  const [trustProxy, setTrustProxy] = useState(false)
   const [appSecret, setAppSecret] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -72,7 +71,6 @@ export function SetupPage() {
         base_url: baseURL.trim(),
         http_addr: httpAddr.trim(),
         db_path: dbPath.trim(),
-        trust_proxy_headers: trustProxy,
         app_secret: appSecret.trim(),
       })
       // 重新探测状态后进入登录页。
@@ -157,10 +155,6 @@ export function SetupPage() {
                   <Label htmlFor="su-db">数据库路径</Label>
                   <Input id="su-db" value={dbPath} onChange={(e) => setDBPath(e.target.value)} />
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={trustProxy} onChange={(e) => setTrustProxy(e.target.checked)} />
-                  信任反代头（部署在 Cloudflare / Nginx / Caddy 之后时开启）
-                </label>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="su-secret">app_secret（设备码签名密钥）</Label>
                   <Input id="su-secret" value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder="留空自动生成" />

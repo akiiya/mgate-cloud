@@ -29,7 +29,6 @@ type routeDeps struct {
 	pull       *agent.PullHandlers
 	authSvc    *auth.Service
 	distFS     fs.FS
-	trustProxy bool
 	setupDone  *atomic.Bool
 	readyCheck func(ctx context.Context) error // 就绪探测（DB 可用即就绪）
 }
@@ -96,8 +95,8 @@ func buildRoutes(d routeDeps) http.Handler {
 	root.Handle("/api/", setupGuard(d.setupDone, apiMux))
 	root.Handle("/", webui.NewSPAHandler(d.distFS))
 
-	// 中间件自外向内：请求 ID → 客户端 IP（按可信代理策略）→ panic 恢复 → 业务路由。
-	return audit.RequestID(audit.RealIP(d.trustProxy)(recoverMiddleware(root)))
+	// 中间件自外向内：请求 ID → 解析真实客户端 IP（自适配 CF / 反代 / 直连）→ panic 恢复 → 业务路由。
+	return audit.RequestID(audit.RealIP(recoverMiddleware(root)))
 }
 
 // setupGuard 在 setup 未完成时，仅放行 healthz/readyz/setup 接口，其余 /api/* 返回 setup_required。

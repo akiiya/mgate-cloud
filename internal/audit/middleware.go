@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"strings"
 
 	"mgate-cloud/internal/util"
 )
@@ -40,10 +41,10 @@ func RequestIDFrom(ctx context.Context) string {
 	return ""
 }
 
-// ClientIP 返回客户端 IP。
+// ClientIP 返回客户端真实 IP。
 //
-// 优先取 RealIP 中间件注入 context 的结果（按可信代理策略计算）；若未经中间件
-// （如单元测试直接调用），保守地仅用 RemoteAddr，绝不信任请求头。
+// 优先取 RealIP 中间件注入 context 的结果；若未经中间件（如单元测试直接调用），
+// 退回 RemoteAddr。
 func ClientIP(r *http.Request) string {
 	if ip, ok := r.Context().Value(clientIPKey).(string); ok && ip != "" {
 		return ip
@@ -51,33 +52,35 @@ func ClientIP(r *http.Request) string {
 	return remoteAddrIP(r)
 }
 
-// RealIP 中间件按可信代理策略计算客户端 IP 并注入 context。
+// RealIP 中间件计算客户端真实 IP 并注入 context，自动适配不同部署环境：
 //
-// 安全要点：只有 trustProxy=true（确实部署于可信反代之后）时才采纳请求头中的来源 IP，
-// 否则任何客户端都能伪造 X-Forwarded-For / CF-Connecting-IP 来污染审计。
-// 信任时优先 CF-Connecting-IP（Cloudflare 单值，不可被客户端追加），其次 X-Forwarded-For 首段。
-func RealIP(trustProxy bool) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := resolveClientIP(r, trustProxy)
-			ctx := context.WithValue(r.Context(), clientIPKey, ip)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
+//   - Cloudflare：取 CF-Connecting-IP（Cloudflare 注入的真实客户端，单值不可被客户端追加）。
+//   - 其它反代（Caddy/Nginx 等）：取 X-Forwarded-For 最左侧（最初客户端）。
+//   - 直连：取 RemoteAddr 对端地址。
+//
+// 这样无需任何配置即可在各环境拿到“登录者的真实来源 IP”，供审计与登录失败限流使用。
+//
+// 注意（部署约定）：本服务应只经反代访问、不直接暴露公网（绑定 127.0.0.1 / 私有网或防火墙限制）。
+// 此前提下转发头由可信反代设置，不会被外部伪造。
+func RealIP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), clientIPKey, resolveClientIP(r))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
-// resolveClientIP 依据可信代理策略计算客户端 IP。
-func resolveClientIP(r *http.Request, trustProxy bool) string {
-	if trustProxy {
-		if cf := trimSpace(r.Header.Get("CF-Connecting-IP")); cf != "" {
-			return cf
-		}
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			// "client, proxy1, proxy2"，取第一段（最初客户端）。
-			if comma := indexByte(xff, ','); comma >= 0 {
-				return trimSpace(xff[:comma])
+// resolveClientIP 按 CF-Connecting-IP → X-Forwarded-For(最左有效) → RemoteAddr 的顺序解析真实客户端 IP。
+func resolveClientIP(r *http.Request) string {
+	if cf := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); cf != "" && net.ParseIP(cf) != nil {
+		return cf
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// "client, proxy1, proxy2"：最左侧为最初客户端，取第一个能解析的 IP。
+		for _, part := range strings.Split(xff, ",") {
+			ip := strings.TrimSpace(part)
+			if ip != "" && net.ParseIP(ip) != nil {
+				return ip
 			}
-			return trimSpace(xff)
 		}
 	}
 	return remoteAddrIP(r)
@@ -89,25 +92,4 @@ func remoteAddrIP(r *http.Request) string {
 		return host
 	}
 	return r.RemoteAddr
-}
-
-// 以下两个小工具避免为简单操作引入 strings 包，保持本文件聚焦。
-func indexByte(s string, b byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == b {
-			return i
-		}
-	}
-	return -1
-}
-
-func trimSpace(s string) string {
-	start, end := 0, len(s)
-	for start < end && s[start] == ' ' {
-		start++
-	}
-	for end > start && s[end-1] == ' ' {
-		end--
-	}
-	return s[start:end]
 }

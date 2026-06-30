@@ -41,7 +41,7 @@
 - [ ] `MGATE_APP_SECRET` 已设为固定高强度随机串（为空将拒绝启动）
 - [ ] `MGATE_COOKIE_SECURE=true`（HTTPS 部署）
 - [ ] `MGATE_BASE_URL` 为对外地址（影响下发给 agent 的 gateway/ws/pull）
-- [ ] 置于可信反代之后时 `MGATE_TRUST_PROXY_HEADERS=true`，否则保持 false
+- [ ] 仅经反代访问、本服务**不直接裸奔公网**（绑定 `127.0.0.1`/私有网或防火墙限制），保证真实 IP 解析可信
 - [ ] 首次创建管理员后从环境移除 `MGATE_ADMIN_PASSWORD`
 - [ ] 数据库目录可写、已纳入备份
 

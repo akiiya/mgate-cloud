@@ -55,7 +55,6 @@ type setupRequest struct {
 	DBPath               string `json:"db_path"`
 	Mode                 string `json:"mode"`
 	CookieSecure         *bool  `json:"cookie_secure"`
-	TrustProxyHeaders    *bool  `json:"trust_proxy_headers"`
 	AppSecret            string `json:"app_secret"`
 	AdminUsername        string `json:"admin_username"`
 	AdminPassword        string `json:"admin_password"`
@@ -118,7 +117,6 @@ func (h *SetupHandlers) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cookieSecure := derefBool(req.CookieSecure, strings.HasPrefix(strings.ToLower(orDefault(req.BaseURL, h.cfg.BaseURL)), "https://"))
-	trustProxy := derefBool(req.TrustProxyHeaders, false)
 	updateEnabled := true
 
 	fc := &config.FileConfig{
@@ -127,7 +125,6 @@ func (h *SetupHandlers) Complete(w http.ResponseWriter, r *http.Request) {
 		DBPath:             orDefault(req.DBPath, h.cfg.DBPath),
 		Mode:               mode,
 		CookieSecure:       &cookieSecure,
-		TrustProxyHeaders:  &trustProxy,
 		AppSecret:          appSecret,
 		AdminUsername:      username,
 		AdminPasswordHash:  hash,

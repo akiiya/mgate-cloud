@@ -8,14 +8,13 @@ import (
 // TestSaveLoadRoundTrip 验证配置文件保存后可原样读回（含需转义的 app_secret）。
 func TestSaveLoadRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	tru, fal, upd := true, false, true
+	tru, upd := true, true
 	in := &FileConfig{
 		HTTPAddr:           ":9090",
 		BaseURL:            "https://cloud.example.com",
 		DBPath:             "/var/lib/x.db",
 		Mode:               "prod",
 		CookieSecure:       &tru,
-		TrustProxyHeaders:  &fal,
 		AppSecret:          `se"cret\with/special+chars=`,
 		AdminUsername:      "root",
 		AdminPasswordHash:  "$2a$12$abcdefghijklmnopqrstuv",
@@ -38,9 +37,6 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if out.CookieSecure == nil || *out.CookieSecure != true {
 		t.Errorf("cookie_secure 应为 true")
-	}
-	if out.TrustProxyHeaders == nil || *out.TrustProxyHeaders != false {
-		t.Errorf("trust_proxy_headers 应为 false")
 	}
 	if out.UpdateChannel != "rc" {
 		t.Errorf("update_channel 不一致")

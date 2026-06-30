@@ -5,10 +5,29 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 
 	"mgate-cloud/internal/util"
 )
+
+// bannable 报告某个 IP 是否可被封禁。
+//
+// 只封禁“真实公网来源 IP”：本地回环（127.0.0.1/::1）、私有网段、链路本地、未指定地址、
+// 以及无法解析的值一律不封——避免误把反代/基础设施 IP 拉黑而锁死所有人。
+// 配合 audit.RealIP 已将 Cloudflare/反代还原为真实客户端 IP，故代理本身的 IP 不会成为封禁对象。
+func bannable(ip string) bool {
+	p := net.ParseIP(strings.TrimSpace(ip))
+	if p == nil {
+		return false
+	}
+	if p.IsLoopback() || p.IsPrivate() || p.IsUnspecified() ||
+		p.IsLinkLocalUnicast() || p.IsLinkLocalMulticast() {
+		return false
+	}
+	return true
+}
 
 // ThrottleSettings 配置登录失败限流策略。
 //
@@ -99,7 +118,7 @@ func NewLoginThrottle(store *LoginThrottleStore, clock util.Clock, settings Thro
 //
 // 失败开放：限流自身查询出错时放行（DB 故障时整体已不可用，不应让限流把管理员彻底锁死）。
 func (t *LoginThrottle) Allow(ctx context.Context, ip string) (allowed bool, retryAfter time.Duration) {
-	if !t.settings.Enabled || ip == "" {
+	if !t.settings.Enabled || !bannable(ip) {
 		return true, 0
 	}
 	a, ok, err := t.store.get(ctx, ip)
@@ -115,7 +134,7 @@ func (t *LoginThrottle) Allow(ctx context.Context, ip string) (allowed bool, ret
 
 // RecordFailure 记录一次登录失败；若因此触发封禁，返回 banned=true 与本次封禁时长。
 func (t *LoginThrottle) RecordFailure(ctx context.Context, ip string) (banned bool, banFor time.Duration) {
-	if !t.settings.Enabled || ip == "" {
+	if !t.settings.Enabled || !bannable(ip) {
 		return false, 0
 	}
 	a, _, err := t.store.get(ctx, ip)
@@ -154,7 +173,7 @@ func (t *LoginThrottle) RecordFailure(ctx context.Context, ip string) (banned bo
 
 // RecordSuccess 在登录成功后清除该 IP 的失败/封禁记录。
 func (t *LoginThrottle) RecordSuccess(ctx context.Context, ip string) {
-	if !t.settings.Enabled || ip == "" {
+	if !t.settings.Enabled || !bannable(ip) {
 		return
 	}
 	_ = t.store.delete(ctx, ip)

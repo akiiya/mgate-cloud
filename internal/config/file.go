@@ -25,7 +25,6 @@ type FileConfig struct {
 	DBPath            string
 	Mode              string
 	CookieSecure      *bool
-	TrustProxyHeaders *bool
 	AppSecret         string
 	AdminUsername     string
 	AdminPassword     string // 仅读取兼容；不写入
@@ -96,7 +95,6 @@ func LoadFile(path string) (*FileConfig, error) {
 		DBPath:             kv["db_path"],
 		Mode:               kv["mode"],
 		CookieSecure:       boolPtr(kv, "cookie_secure"),
-		TrustProxyHeaders:  boolPtr(kv, "trust_proxy_headers"),
 		AppSecret:          kv["app_secret"],
 		AdminUsername:      kv["admin_username"],
 		AdminPassword:      kv["admin_password"],
@@ -128,7 +126,6 @@ func SaveFile(path string, fc *FileConfig) error {
 	writeStr(&b, "db_path", fc.DBPath)
 	writeStr(&b, "mode", fc.Mode)
 	writeBool(&b, "cookie_secure", fc.CookieSecure)
-	writeBool(&b, "trust_proxy_headers", fc.TrustProxyHeaders)
 	b.WriteString("\n# 设备码签名密钥：生产环境必须固定保存；丢失将导致已发设备码校验失败。\n")
 	writeStr(&b, "app_secret", fc.AppSecret)
 	b.WriteString("\n# 管理员：仅保存口令哈希（bcrypt），绝不保存明文。\n")

@@ -26,10 +26,6 @@ type Config struct {
 	// CookieSecure 控制下发的 cookie 是否带 Secure 属性。
 	// 本地 http 开发置 false；公网 https（经 Cloudflare）部署务必置 true。
 	CookieSecure bool
-	// TrustProxyHeaders 控制是否信任反代下发的客户端 IP 头
-	// （CF-Connecting-IP / X-Forwarded-For）。仅在确实部署于可信反代之后时才置 true，
-	// 否则客户端可伪造来源 IP。默认 false，仅用 RemoteAddr。
-	TrustProxyHeaders bool
 
 	// AdminUsername / AdminPassword 用于首次启动时 bootstrap 管理员。
 	// 仅在系统中尚无任何管理员时生效，且明文口令绝不写入日志。
@@ -127,7 +123,6 @@ type Config struct {
 const (
 	envConfigPath   = "MGATE_CONFIG"
 	envMode         = "MGATE_MODE"
-	envTrustProxy   = "MGATE_TRUST_PROXY_HEADERS"
 	envHTTPAddr     = "MGATE_HTTP_ADDR"
 	envDBPath       = "MGATE_DB_PATH"
 	envBaseURL      = "MGATE_BASE_URL"
@@ -247,7 +242,6 @@ func loadInternal(fc *FileConfig) Config {
 		DBPath:            pickStr(envDBPath, fc.DBPath, "./data/mgate-cloud.db"),
 		BaseURL:           pickStr(envBaseURL, fc.BaseURL, "http://127.0.0.1:8080"),
 		CookieSecure:      pickBool(envCookieSecure, fc.CookieSecure, false),
-		TrustProxyHeaders: pickBool(envTrustProxy, fc.TrustProxyHeaders, false),
 		AdminUsername:     pickStr(envAdminUsername, fc.AdminUsername, ""),
 		AdminPassword:     pickStr(envAdminPassword, fc.AdminPassword, ""),
 		AdminPasswordHash: fc.AdminPasswordHash,
@@ -354,10 +348,10 @@ func (c Config) HasBootstrapAdmin() bool {
 // 关键点：绝不输出 AdminPassword 明文，避免敏感信息进入启动日志。
 func (c Config) String() string {
 	return fmt.Sprintf(
-		"Config{Mode:%q HTTPAddr:%q DBPath:%q BaseURL:%q CookieSecure:%t TrustProxyHeaders:%t AdminUsername:%q AdminPassword:%s SessionTTL:%s "+
+		"Config{Mode:%q HTTPAddr:%q DBPath:%q BaseURL:%q CookieSecure:%t AdminUsername:%q AdminPassword:%s SessionTTL:%s "+
 			"PairingTTL:%s DeviceTokenBytes:%d PairingTokenBytes:%d AppSecret:%s "+
 			"WSHeartbeatInterval:%s WSOfflineAfter:%s WSMaxMessageBytes:%d}",
-		c.Mode, c.HTTPAddr, c.DBPath, c.BaseURL, c.CookieSecure, c.TrustProxyHeaders, c.AdminUsername, redactedSecret(c.AdminPassword), c.SessionTTL,
+		c.Mode, c.HTTPAddr, c.DBPath, c.BaseURL, c.CookieSecure, c.AdminUsername, redactedSecret(c.AdminPassword), c.SessionTTL,
 		c.PairingTTL, c.DeviceTokenBytes, c.PairingTokenBytes, redactedSecret(c.AppSecret),
 		c.WSHeartbeatInterval, c.WSOfflineAfter, c.WSMaxMessageBytes,
 	)

@@ -255,5 +255,5 @@ mgate-cloud **刻意不具备**以下能力，且不应在任何阶段引入：
 - **存活/就绪**：`GET /api/healthz`（进程存活）、`GET /api/readyz`（数据库 Ping 通过才就绪，否则 503）。
 - **版本**：`internal/version.Version` 由 ldflags 注入，启动日志输出"版本/模式/地址/DB 路径"，绝不输出 secret。
 - **运行模式**：`MGATE_MODE`（dev/test/prod）。prod 下 `MGATE_APP_SECRET` 为空即拒绝启动。
-- **可信代理**：`MGATE_TRUST_PROXY_HEADERS` 控制是否采纳 `CF-Connecting-IP`/`X-Forwarded-For`，默认仅用 `RemoteAddr`。
+- **真实客户端 IP**：自适配解析 `CF-Connecting-IP` → `X-Forwarded-For`(最左) → `RemoteAddr`，无需配置；供审计与登录限流使用。
 - **静态安全闸门**：`internal/securitycheck` 测试扫描源码，禁止 `os/exec`/`exec.Command`/`bash -c`/`sh -c`。

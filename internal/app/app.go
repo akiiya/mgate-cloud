@@ -168,19 +168,18 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	handler := buildRoutes(routeDeps{
-		auth:       handlers,
-		devices:    deviceHandlers,
-		commands:   commandHandlers,
-		setup:      setupHandlers,
-		update:     updateHandlers,
-		system:     systemHandlers,
-		agent:      agentHandlers,
-		ws:         wsHandlers,
-		pull:       pullHandlers,
-		authSvc:    authService,
-		distFS:     distFS,
-		trustProxy: cfg.TrustProxyHeaders,
-		setupDone:  &setupDone,
+		auth:      handlers,
+		devices:   deviceHandlers,
+		commands:  commandHandlers,
+		setup:     setupHandlers,
+		update:    updateHandlers,
+		system:    systemHandlers,
+		agent:     agentHandlers,
+		ws:        wsHandlers,
+		pull:      pullHandlers,
+		authSvc:   authService,
+		distFS:    distFS,
+		setupDone: &setupDone,
 		// 就绪探测：数据库可 Ping 即视为就绪。
 		readyCheck: func(ctx context.Context) error { return database.PingContext(ctx) },
 	})
