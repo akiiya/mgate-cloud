@@ -81,6 +81,7 @@ go build -o mgate-cloud ./cmd/mgate-cloud
 | [docs/setup.md](docs/setup.md) | 无配置启动与初始化、config.yaml |
 | [docs/update.md](docs/update.md) | 检查更新 / 自更新 |
 | [docs/deployment.md](docs/deployment.md) | 生产部署（systemd / 反代 / 备份） |
+| [docs/releasing.md](docs/releasing.md) | 发版操作手册（打 tag 发布、Release Notes、校验） |
 | [docs/release-assets.md](docs/release-assets.md) | 发布资产格式与 dev/main 分支流程 |
 | [docs/release-checklist.md](docs/release-checklist.md) | 发布清单 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更 |
