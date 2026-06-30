@@ -23,7 +23,6 @@ export interface SetupPayload {
   base_url: string
   http_addr?: string
   db_path?: string
-  trust_proxy_headers?: boolean
   app_secret?: string
 }
 

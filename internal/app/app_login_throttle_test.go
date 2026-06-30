@@ -62,24 +62,39 @@ func newThrottleEnv(t *testing.T, maxFailures int) *testEnv {
 	return &testEnv{server: srv, client: &http.Client{Jar: jar}, dbPath: dbPath}
 }
 
-// TestLoginThrottleBansAfterFailures 验证：达到失败阈值后，同一来源即便口令正确也被 429 拦截。
+// loginWithIP 模拟“经反代、来自某真实客户端 IP”的登录请求（通过 X-Forwarded-For 注入）。
+func (e *testEnv) loginWithIP(t *testing.T, csrf, clientIP, body string) (*http.Response, error) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, e.server.URL+"/api/auth/login", strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrf)
+	req.Header.Set("X-Forwarded-For", clientIP)
+	return e.client.Do(req)
+}
+
+// TestLoginThrottleBansAfterFailures 验证：达到失败阈值后，同一真实客户端 IP 即便口令正确也被 429 拦截。
 func TestLoginThrottleBansAfterFailures(t *testing.T) {
 	env := newThrottleEnv(t, 3)
 	csrf := env.fetchCSRF(t)
+	const clientIP = "203.0.113.66" // 模拟反代后的真实公网客户端
 
 	// 前 3 次错误口令：返回 401 invalid_credentials。
 	for i := 0; i < 3; i++ {
-		status, body := env.do(t, http.MethodPost, "/api/auth/login", csrf, `{"username":"admin","password":"wrong"}`)
-		if status != http.StatusUnauthorized || body.Error == nil || body.Error.Code != "invalid_credentials" {
-			t.Fatalf("第 %d 次失败应为 401 invalid_credentials，实际 status=%d err=%+v", i+1, status, body.Error)
+		resp, err := env.loginWithIP(t, csrf, clientIP, `{"username":"admin","password":"wrong"}`)
+		if err != nil {
+			t.Fatalf("请求失败: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("第 %d 次失败应为 401，实际 %d", i+1, resp.StatusCode)
 		}
 	}
 
-	// 第 4 次：即使口令正确也应被封禁拦截，返回 429 too_many_attempts，并带 Retry-After。
-	req, _ := http.NewRequest(http.MethodPost, env.server.URL+"/api/auth/login", strings.NewReader(`{"username":"admin","password":"test-password-123"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-CSRF-Token", csrf)
-	resp, err := env.client.Do(req)
+	// 第 4 次：即使口令正确也应被封禁拦截，返回 429 + Retry-After。
+	resp, err := env.loginWithIP(t, csrf, clientIP, `{"username":"admin","password":"test-password-123"}`)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
 	}
@@ -89,6 +104,25 @@ func TestLoginThrottleBansAfterFailures(t *testing.T) {
 	}
 	if resp.Header.Get("Retry-After") == "" {
 		t.Error("429 响应应包含 Retry-After 头")
+	}
+}
+
+// TestLoginThrottleNeverBansLocalIP 验证：来自本地/回环（无真实公网 IP）的失败不会触发封禁，
+// 避免把反代/基础设施 IP 拉黑而锁死所有人。
+func TestLoginThrottleNeverBansLocalIP(t *testing.T) {
+	env := newThrottleEnv(t, 3)
+	csrf := env.fetchCSRF(t)
+
+	// 不带 X-Forwarded-For：解析到的 IP 为本地回环（127.0.0.1），属不可封禁范围。
+	for i := 0; i < 6; i++ {
+		status, _ := env.do(t, http.MethodPost, "/api/auth/login", csrf, `{"username":"admin","password":"wrong"}`)
+		if status != http.StatusUnauthorized {
+			t.Fatalf("本地来源应始终返回 401（不封禁），第 %d 次实际 %d", i+1, status)
+		}
+	}
+	// 正确口令仍可登录（未被误封）。
+	if status, body := env.do(t, http.MethodPost, "/api/auth/login", csrf, `{"username":"admin","password":"test-password-123"}`); status != http.StatusOK || !body.OK {
+		t.Fatalf("本地来源不应被封禁，正确口令应登录成功，实际 %d", status)
 	}
 }
 

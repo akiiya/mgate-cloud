@@ -56,7 +56,6 @@ go build -o mgate-cloud ./cmd/mgate-cloud
 | `MGATE_DB_PATH` | `./data/mgate-cloud.db` | SQLite 路径（目录自动创建） |
 | `MGATE_BASE_URL` | `http://127.0.0.1:8080` | 对外地址（下发给 agent 的 gateway/ws/pull） |
 | `MGATE_COOKIE_SECURE` | `false` | HTTPS 部署置 `true` |
-| `MGATE_TRUST_PROXY_HEADERS` | `false` | 置于可信反代之后才置 `true`（采纳 CF-Connecting-IP / XFF） |
 | `MGATE_APP_SECRET` | （空） | 设备码 HMAC 密钥；生产必须固定且足够随机 |
 | `MGATE_ADMIN_USERNAME` / `MGATE_ADMIN_PASSWORD` | （空） | 首次 bootstrap 管理员 |
 

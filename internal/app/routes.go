@@ -4,7 +4,6 @@ import (
 	"context"
 	"io/fs"
 	"log"
-	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -19,21 +18,19 @@ import (
 
 // routeDeps 汇集装配路由所需的处理器与依赖，避免 buildRoutes 参数过长。
 type routeDeps struct {
-	auth           *admin.Handlers
-	devices        *admin.DeviceHandlers
-	commands       *admin.CommandHandlers
-	setup          *admin.SetupHandlers
-	update         *admin.UpdateHandlers
-	system         *admin.SystemHandlers
-	agent          *agent.Handlers
-	ws             *agent.WSHandlers
-	pull           *agent.PullHandlers
-	authSvc        *auth.Service
-	distFS         fs.FS
-	trustedProxies []*net.IPNet // 可信代理网段：据此从转发头还原真实客户端 IP
-	trustBlanket   bool         // 兼容旧 MGATE_TRUST_PROXY_HEADERS=true 的无条件信任
-	setupDone      *atomic.Bool
-	readyCheck     func(ctx context.Context) error // 就绪探测（DB 可用即就绪）
+	auth       *admin.Handlers
+	devices    *admin.DeviceHandlers
+	commands   *admin.CommandHandlers
+	setup      *admin.SetupHandlers
+	update     *admin.UpdateHandlers
+	system     *admin.SystemHandlers
+	agent      *agent.Handlers
+	ws         *agent.WSHandlers
+	pull       *agent.PullHandlers
+	authSvc    *auth.Service
+	distFS     fs.FS
+	setupDone  *atomic.Bool
+	readyCheck func(ctx context.Context) error // 就绪探测（DB 可用即就绪）
 }
 
 // buildRoutes 装配全部路由与中间件，返回顶层 HTTP 处理器。
@@ -98,8 +95,8 @@ func buildRoutes(d routeDeps) http.Handler {
 	root.Handle("/api/", setupGuard(d.setupDone, apiMux))
 	root.Handle("/", webui.NewSPAHandler(d.distFS))
 
-	// 中间件自外向内：请求 ID → 客户端 IP（按可信代理策略）→ panic 恢复 → 业务路由。
-	return audit.RequestID(audit.RealIP(d.trustedProxies, d.trustBlanket)(recoverMiddleware(root)))
+	// 中间件自外向内：请求 ID → 解析真实客户端 IP（自适配 CF / 反代 / 直连）→ panic 恢复 → 业务路由。
+	return audit.RequestID(audit.RealIP(recoverMiddleware(root)))
 }
 
 // setupGuard 在 setup 未完成时，仅放行 healthz/readyz/setup 接口，其余 /api/* 返回 setup_required。

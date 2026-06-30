@@ -8,7 +8,7 @@ cloud.example.com {
 
 	# 反代到本地 mgate-cloud；WebSocket（/api/agent/ws）由 Caddy 自动透传，无需额外配置。
 	reverse_proxy 127.0.0.1:8080 {
-		# 传递真实客户端 IP；mgate-cloud 需配合 MGATE_TRUST_PROXY_HEADERS=true。
+		# 透传真实客户端 IP；mgate-cloud 自动从 X-Forwarded-For 取真实来源（无需额外配置）。
 		header_up X-Forwarded-For {remote_host}
 	}
 }
