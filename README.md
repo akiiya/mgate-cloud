@@ -48,8 +48,9 @@ curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/ins
 服务以 `mgate` 用户运行、监听 `127.0.0.1:8080`；前置 Caddy/Nginx 终结 HTTPS 后，浏览器打开
 `https://你的域名/#/setup` 创建管理员。**升级**：重跑该命令（保留数据）。
 
+**一键卸载**：
+
 ```bash
-# 卸载
 sudo bash scripts/uninstall.sh              # 完全卸载（二次确认）
 sudo bash scripts/uninstall.sh --keep-data  # 保留数据，便于重装
 ```
