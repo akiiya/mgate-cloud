@@ -62,6 +62,13 @@ curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/ins
 | `MGATE_ADMIN_USERNAME` / `MGATE_ADMIN_PASSWORD` | 直接创建管理员（否则走浏览器 Setup） |
 | `VERSION` | 指定版本（默认最新 Release） |
 
+卸载：
+
+```bash
+sudo bash scripts/uninstall.sh              # 完全卸载（含数据/配置/用户，会二次确认）
+sudo bash scripts/uninstall.sh --keep-data  # 保留数据与配置，便于日后重装
+```
+
 > 反向代理示例见 [`deploy/Caddyfile.example`](deploy/Caddyfile.example) / [`deploy/nginx.conf.example`](deploy/nginx.conf.example)；生产要点见 [docs/deployment.md](docs/deployment.md)。
 
 分项验收命令：
