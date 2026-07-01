@@ -52,8 +52,11 @@ curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/ins
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/uninstall.sh | sudo bash
+```
 
-# 完全卸载（连数据/配置/用户一并删除，不可恢复）
+完全卸载（连数据 / 配置 / 用户一并删除，不可恢复）：
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/uninstall.sh | sudo bash -s -- --purge
 ```
 
