@@ -48,6 +48,9 @@ curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/ins
 装好后服务以 `mgate` 用户运行、监听 `127.0.0.1:8080`（请在其前置 Caddy/Nginx 终结 HTTPS）。
 浏览器打开 `https://你的域名/#/setup` 创建管理员即可。**升级**：重跑同一命令（保留配置与数据）。
 
+> 更稳妥的做法是**先下载审阅再执行**（`curl | sudo bash` 等于把 root 交给远端脚本）：
+> `curl -fsSL .../scripts/install.sh -o install.sh && less install.sh && sudo bash install.sh`。
+
 非交互初始化（直接建管理员、指定对外地址 / 版本，可选）：
 
 ```bash

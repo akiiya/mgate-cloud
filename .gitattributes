@@ -1,0 +1,2 @@
+# Shell 脚本始终以 LF 检出，避免 Windows CRLF 破坏 shebang / bash 解析。
+*.sh text eol=lf

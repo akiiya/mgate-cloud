@@ -45,6 +45,9 @@ gen_secret() {
 	fi
 }
 
+# 安全下载：强制 HTTPS（含重定向）、TLS ≥ 1.2、失败自动重试。
+dl() { curl --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 --retry-delay 2 -fSL "$@"; }
+
 # --- 前置检查 ---
 [ "$(id -u)" = 0 ] || die "请用 root 运行：curl -fsSL <url> | sudo bash"
 [ "$(uname -s)" = Linux ] || die "本脚本仅支持 Linux"
@@ -61,7 +64,7 @@ esac
 # --- 解析版本 ---
 if [ -z "$VERSION" ]; then
 	log "查询最新版本…"
-	VERSION="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
+	VERSION="$(dl -s "https://api.github.com/repos/$REPO/releases/latest" |
 		grep -o '"tag_name":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
 	[ -n "$VERSION" ] || die "无法获取最新版本，请用 VERSION=vX.Y.Z 指定"
 fi
@@ -74,8 +77,8 @@ log "准备安装 mgate-cloud $VERSION（$ARCH）"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 log "下载 $ASSET"
-curl -fSL "$BASE_DL/$ASSET" -o "$TMP/$ASSET" || die "下载二进制失败"
-curl -fSL "$BASE_DL/SHA256SUMS" -o "$TMP/SHA256SUMS" || die "下载校验和失败"
+dl "$BASE_DL/$ASSET" -o "$TMP/$ASSET" || die "下载二进制失败"
+dl "$BASE_DL/SHA256SUMS" -o "$TMP/SHA256SUMS" || die "下载校验和失败"
 log "校验 SHA256"
 (cd "$TMP" && grep " $ASSET\$" SHA256SUMS | sha256sum -c -) || die "SHA256 校验失败，已中止"
 tar -xzf "$TMP/$ASSET" -C "$TMP"
@@ -109,21 +112,24 @@ if [ "$FRESH_INSTALL" = true ]; then
 	COOKIE_SECURE=false
 	case "$BASE_URL" in https://*) COOKIE_SECURE=true ;; esac
 	SECRET="$(gen_secret)"
-	umask 077
-	{
-		echo "# mgate-cloud 运行配置（权限 600，含 app_secret，请妥善保管）。"
-		echo "# 生成于 $(date -u '+%Y-%m-%dT%H:%M:%SZ')。"
-		echo "MGATE_MODE=prod"
-		echo "MGATE_HTTP_ADDR=127.0.0.1:8080"
-		echo "MGATE_DB_PATH=$DATA_DIR/mgate-cloud.db"
-		echo "MGATE_BASE_URL=$BASE_URL"
-		echo "MGATE_COOKIE_SECURE=$COOKIE_SECURE"
-		echo "MGATE_APP_SECRET=$SECRET"
-		if [ -n "${MGATE_ADMIN_USERNAME:-}" ] && [ -n "${MGATE_ADMIN_PASSWORD:-}" ]; then
-			echo "MGATE_ADMIN_USERNAME=$MGATE_ADMIN_USERNAME"
-			echo "MGATE_ADMIN_PASSWORD=$MGATE_ADMIN_PASSWORD"
-		fi
-	} >"$ENV_FILE"
+	# 在子 shell 内收紧 umask 写文件，避免 umask 泄漏影响后续（如 systemd 单元）权限。
+	(
+		umask 077
+		{
+			echo "# mgate-cloud 运行配置（权限 600，含 app_secret，请妥善保管）。"
+			echo "# 生成于 $(date -u '+%Y-%m-%dT%H:%M:%SZ')。"
+			echo "MGATE_MODE=prod"
+			echo "MGATE_HTTP_ADDR=127.0.0.1:8080"
+			echo "MGATE_DB_PATH=$DATA_DIR/mgate-cloud.db"
+			echo "MGATE_BASE_URL=$BASE_URL"
+			echo "MGATE_COOKIE_SECURE=$COOKIE_SECURE"
+			echo "MGATE_APP_SECRET=$SECRET"
+			if [ -n "${MGATE_ADMIN_USERNAME:-}" ] && [ -n "${MGATE_ADMIN_PASSWORD:-}" ]; then
+				echo "MGATE_ADMIN_USERNAME=$MGATE_ADMIN_USERNAME"
+				echo "MGATE_ADMIN_PASSWORD=$MGATE_ADMIN_PASSWORD"
+			fi
+		} >"$ENV_FILE"
+	)
 	chmod 600 "$ENV_FILE"
 	[ -n "${MGATE_ADMIN_USERNAME:-}" ] && [ -n "${MGATE_ADMIN_PASSWORD:-}" ] && ADMIN_PRESET=true
 else
@@ -163,6 +169,7 @@ ReadWritePaths=$DATA_DIR
 [Install]
 WantedBy=multi-user.target
 EOF
+chmod 0644 "$UNIT"
 
 log "启动服务"
 systemctl daemon-reload
