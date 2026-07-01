@@ -1,12 +1,12 @@
 # Agent WebSocket 协议 🔌
 
-本文描述 Phase 3 的 Agent WebSocket 通道：连接鉴权、消息信封、支持的消息类型、
+本文描述 Agent WebSocket 通道：连接鉴权、消息信封、支持的消息类型、
 在线状态判定与部署注意事项。
 
-> 本文聚焦连接与状态消息（Phase 3）。Phase 4 起本通道额外承载**命令通道**
+> 本文聚焦连接与状态消息。本通道还额外承载**命令通道**
 > （`command.deliver` / `command.ack` / `command.result`），其设计见 [commands.md](commands.md)。
 >
-> 当 agent 无法保持 WebSocket 时，可改用 **HTTPS Pull 兜底**（Phase 5）：见 [agent-pull.md](agent-pull.md)。
+> 当 agent 无法保持 WebSocket 时，可改用 **HTTPS Pull 兜底**：见 [agent-pull.md](agent-pull.md)。
 > 两通道共用命令 lease，不会重复投递。
 >
 > 边界提醒：**没有**任何远程 shell；cloud 只投递白名单 action 的 JSON，不执行命令、不拼接 shell。
@@ -61,8 +61,8 @@ Authorization: Bearer mgdt_xxx
 
 ## 支持的消息类型
 
-agent → cloud：`agent.hello`、`agent.heartbeat`、`agent.status`，以及（Phase 4）`command.ack`、`command.result`
-cloud → agent：`server.hello`、`server.pong`、`error`，以及（Phase 4）`command.deliver`
+agent → cloud：`agent.hello`、`agent.heartbeat`、`agent.status`，以及 `command.ack`、`command.result`
+cloud → agent：`server.hello`、`server.pong`、`error`，以及 `command.deliver`
 
 > 命令通道消息（`command.deliver/ack/result`）的字段与处理见 [commands.md](commands.md)。
 > 严禁出现 `exec.raw` / `shell` / `bash` / `script` 等任何让 cloud 直接控制系统的消息。
@@ -177,9 +177,8 @@ go run ./cmd/mgate-agent-sim \
 | `MGATE_WS_OFFLINE_AFTER_SEC` | `90` | 离线判定阈值；读超时与清理也以此为界 |
 | `MGATE_WS_MAX_MESSAGE_BYTES` | `65536` | 单条消息大小上限 |
 
-## 不在本阶段（刻意排除）
+## 刻意排除的能力（安全边界）
 
-- ❌ HTTPS Pull 与离线命令补偿
 - ❌ 任意远程 shell（SSH / `bash -c` / `os/exec`）
 - ❌ cloud 执行命令 / 拼接 mgate.sh（命令通道只下发白名单 action 的 JSON）
 - ❌ 把 `capabilities` 当作可执行命令使用
