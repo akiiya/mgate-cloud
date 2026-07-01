@@ -8,12 +8,11 @@
 # 用法：
 #   curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/install.sh | sudo bash
 #
+# 初始化（创建管理员、对外地址等）一律在浏览器的 Setup 页完成，脚本不预置这些参数。
+#
 # 可选环境变量：
-#   VERSION               指定版本（默认安装最新 Release，如 v0.1.0）
-#   REPO                  来源仓库（默认 akiiya/mgate-cloud）
-#   MGATE_BASE_URL        对外访问地址（https 时自动开启 Secure Cookie）
-#   MGATE_ADMIN_USERNAME  预置管理员用户名（与下方口令同时提供才生效）
-#   MGATE_ADMIN_PASSWORD  预置管理员口令（提供后无需浏览器初始化；建议登录后从配置移除）
+#   VERSION  指定版本（默认安装最新 Release，如 v0.1.0）
+#   REPO     来源仓库（默认 akiiya/mgate-cloud）
 #
 # 重复执行即为“升级”：仅替换二进制并重启，保留既有配置与数据。
 set -euo pipefail
@@ -104,34 +103,25 @@ install -d -m 0750 -o "$SVC_USER" -g "$SVC_GROUP" "$DATA_DIR"
 log "安装二进制到 $BIN"
 install -m 0755 "$TMP/mgate-cloud" "$BIN"
 
-# --- 运行配置（存在则保留，不覆盖 app_secret / 管理员等） ---
-ADMIN_PRESET=false
+# --- 运行配置（存在则保留，不覆盖 app_secret） ---
+# 只写启动所需的最小项：prod 模式必须有固定 app_secret，否则拒绝启动。
+# 对外地址 / Secure Cookie / 管理员等由浏览器 Setup 页配置并写入 config.yaml。
 if [ "$FRESH_INSTALL" = true ]; then
 	log "生成运行配置 $ENV_FILE"
-	BASE_URL="${MGATE_BASE_URL:-http://127.0.0.1:8080}"
-	COOKIE_SECURE=false
-	case "$BASE_URL" in https://*) COOKIE_SECURE=true ;; esac
 	SECRET="$(gen_secret)"
 	# 在子 shell 内收紧 umask 写文件，避免 umask 泄漏影响后续（如 systemd 单元）权限。
 	(
 		umask 077
 		{
 			echo "# mgate-cloud 运行配置（权限 600，含 app_secret，请妥善保管）。"
-			echo "# 生成于 $(date -u '+%Y-%m-%dT%H:%M:%SZ')。"
+			echo "# 生成于 $(date -u '+%Y-%m-%dT%H:%M:%SZ')。其余配置在浏览器 Setup 页完成。"
 			echo "MGATE_MODE=prod"
 			echo "MGATE_HTTP_ADDR=127.0.0.1:8080"
 			echo "MGATE_DB_PATH=$DATA_DIR/mgate-cloud.db"
-			echo "MGATE_BASE_URL=$BASE_URL"
-			echo "MGATE_COOKIE_SECURE=$COOKIE_SECURE"
 			echo "MGATE_APP_SECRET=$SECRET"
-			if [ -n "${MGATE_ADMIN_USERNAME:-}" ] && [ -n "${MGATE_ADMIN_PASSWORD:-}" ]; then
-				echo "MGATE_ADMIN_USERNAME=$MGATE_ADMIN_USERNAME"
-				echo "MGATE_ADMIN_PASSWORD=$MGATE_ADMIN_PASSWORD"
-			fi
 		} >"$ENV_FILE"
 	)
 	chmod 600 "$ENV_FILE"
-	[ -n "${MGATE_ADMIN_USERNAME:-}" ] && [ -n "${MGATE_ADMIN_PASSWORD:-}" ] && ADMIN_PRESET=true
 else
 	warn "检测到已存在 $ENV_FILE：保留现有配置与数据，仅升级二进制"
 fi
@@ -181,23 +171,18 @@ if ! systemctl is-active --quiet mgate-cloud; then
 fi
 
 # --- 结语 ---
-BASE_URL_SHOWN="$(grep -E '^MGATE_BASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
 echo
 log "安装完成：mgate-cloud $VERSION"
 echo "    二进制    : $BIN"
 echo "    配置      : $ENV_FILE（权限 600）"
 echo "    数据目录  : $DATA_DIR"
 echo "    监听       : 127.0.0.1:8080（仅本机；请在其前置 Caddy/Nginx 终结 HTTPS）"
-echo "    对外地址  : $BASE_URL_SHOWN"
 echo
 if [ "$FRESH_INSTALL" != true ]; then
 	echo "已升级并重启，保留原有配置与数据。"
-elif [ "$ADMIN_PRESET" = true ]; then
-	echo "管理员已按环境变量创建，直接访问对外地址登录即可。"
-	echo "建议登录成功后，从 $ENV_FILE 移除 MGATE_ADMIN_PASSWORD 再 systemctl restart mgate-cloud。"
 else
-	echo "下一步：浏览器打开  $BASE_URL_SHOWN/#/setup  创建管理员并完成初始化。"
-	echo "（服务仅监听 127.0.0.1，请先配置反向代理；本机可先用 SSH 隧道访问）"
+	echo "下一步：前置反向代理后，浏览器打开  https://你的域名/#/setup  创建管理员并完成初始化。"
+	echo "（服务仅监听 127.0.0.1，未架反代前可用 SSH 隧道访问 127.0.0.1:8080）"
 fi
 echo
 echo "常用命令：systemctl status mgate-cloud | journalctl -u mgate-cloud -f"

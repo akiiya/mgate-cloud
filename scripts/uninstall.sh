@@ -2,15 +2,15 @@
 #
 # mgate-cloud Linux 卸载脚本（与 install.sh 对称）。
 #
-# 作用：停止并禁用服务 → 删除 systemd 单元 → 删除二进制 → 删除系统用户/组，
-#       并按需删除或保留数据与配置。
+# 默认：停止并禁用服务 → 删除 systemd 单元与二进制，但【保留数据与配置】（含 app_secret），便于日后重装。
+# 加 --purge 才【完全卸载】：连同数据、配置与系统用户一并删除（不可恢复）。
 #
 # 用法：
-#   sudo bash scripts/uninstall.sh              # 完全卸载（含数据/配置/用户，会二次确认）
-#   sudo bash scripts/uninstall.sh --keep-data  # 保留数据与配置（含 app_secret）与用户，便于日后重装
-#   sudo bash scripts/uninstall.sh --yes        # 跳过确认（供自动化）
+#   curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/uninstall.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/uninstall.sh | sudo bash -s -- --purge
 #
-# 也可用环境变量：KEEP_DATA=1 等价于 --keep-data。
+#   --purge        完全卸载（含数据/配置/用户）；也可用环境变量 PURGE=1
+#   --yes | -y     跳过二次确认（供自动化）
 set -euo pipefail
 
 SVC=mgate-cloud
@@ -28,22 +28,19 @@ die() {
 	exit 1
 }
 
-usage() {
-	sed -n '2,17p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' || true
-}
-
-# 归一化 KEEP_DATA 环境变量（1/true/yes 视为真）。先捕获环境值，再重置为布尔。
-_keep_env="${KEEP_DATA:-}"
-KEEP_DATA=false
-case "$_keep_env" in 1 | true | TRUE | yes | YES) KEEP_DATA=true ;; esac
+# 环境变量 PURGE=1/true/yes 等价于 --purge（先捕获环境值，再重置为布尔）。
+_purge_env="${PURGE:-}"
+PURGE=false
+case "$_purge_env" in 1 | true | TRUE | yes | YES) PURGE=true ;; esac
 ASSUME_YES=false
 
 for arg in "$@"; do
 	case "$arg" in
-	--keep-data) KEEP_DATA=true ;;
+	--purge | --all) PURGE=true ;;
+	--keep-data) PURGE=false ;; # 默认即保留数据；保留此别名以兼容
 	-y | --yes) ASSUME_YES=true ;;
 	-h | --help)
-		usage
+		grep -E '^#( |$)' "$0" 2>/dev/null | sed 's/^#\{0,1\} \{0,1\}//' || true
 		exit 0
 		;;
 	*) die "未知参数：$arg（-h 查看用法）" ;;
@@ -53,17 +50,17 @@ done
 [ "$(id -u)" = 0 ] || die "请用 root 运行：sudo bash uninstall.sh"
 [ "$(uname -s)" = Linux ] || die "本脚本仅支持 Linux"
 
-# --- 二次确认（非 --yes 时） ---
+# --- 二次确认 ---
 if [ "$ASSUME_YES" != true ]; then
-	if [ "$KEEP_DATA" = true ]; then
-		prompt="将停止并卸载 mgate-cloud（保留数据与配置）。继续？[y/N] "
+	if [ "$PURGE" = true ]; then
+		prompt="将卸载 mgate-cloud，并【删除全部数据 / 配置 / 用户】，不可恢复。继续？[y/N] "
 	else
-		prompt="将停止并卸载 mgate-cloud，并【删除全部数据 / 配置 / 用户】，不可恢复。继续？[y/N] "
+		prompt="将卸载 mgate-cloud（保留数据与配置，便于重装）。继续？[y/N] "
 	fi
 	if [ -r /dev/tty ]; then
 		read -r -p "$prompt" ans </dev/tty || ans=""
 	else
-		die "非交互环境请加 --yes 确认（可配合 --keep-data 保留数据）"
+		die "非交互环境请加 --yes 确认"
 	fi
 	case "$ans" in y | Y | yes | YES) ;; *)
 		echo "已取消，未做任何更改。"
@@ -93,10 +90,7 @@ if [ -d "$BIN_DIR" ]; then
 fi
 
 # --- 数据 / 配置 / 用户 ---
-if [ "$KEEP_DATA" = true ]; then
-	warn "按要求保留：$DATA_DIR（数据）、$ENV_DIR（配置，含 app_secret）与用户 $SVC_USER"
-	warn "日后重跑 install.sh 即可在原数据上恢复运行。"
-else
+if [ "$PURGE" = true ]; then
 	if [ -d "$ENV_DIR" ]; then
 		log "删除配置目录 $ENV_DIR"
 		rm -rf "$ENV_DIR"
@@ -109,12 +103,13 @@ else
 		log "删除系统用户 $SVC_USER"
 		userdel "$SVC_USER" 2>/dev/null || warn "删除用户 $SVC_USER 失败（可稍后手动 userdel）"
 	fi
-	if getent group "$SVC_GROUP" >/dev/null 2>&1; then
-		groupdel "$SVC_GROUP" 2>/dev/null || true
-	fi
+	getent group "$SVC_GROUP" >/dev/null 2>&1 && groupdel "$SVC_GROUP" 2>/dev/null || true
+else
+	warn "已保留：$DATA_DIR（数据）、$ENV_DIR（配置，含 app_secret）与用户 $SVC_USER"
+	warn "日后重跑 install.sh 即可在原数据上恢复运行；如需彻底清除请加 --purge。"
 fi
 
 echo
 log "mgate-cloud 已卸载"
-[ "$KEEP_DATA" = true ] && echo "（数据与配置已保留）"
+[ "$PURGE" != true ] && echo "（数据与配置已保留）"
 exit 0
