@@ -49,11 +49,6 @@ curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/ins
 `https://你的域名/#/setup` 创建管理员。**升级**：重跑该命令（保留数据）。
 
 ```bash
-# 非交互初始化（可选，直接建管理员 / 指定对外地址）
-curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/install.sh \
-  | sudo MGATE_BASE_URL=https://cloud.example.com \
-         MGATE_ADMIN_USERNAME=admin MGATE_ADMIN_PASSWORD='强口令' bash
-
 # 卸载
 sudo bash scripts/uninstall.sh              # 完全卸载（二次确认）
 sudo bash scripts/uninstall.sh --keep-data  # 保留数据，便于重装

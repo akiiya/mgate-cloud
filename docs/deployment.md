@@ -14,9 +14,8 @@ curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/ins
 ```
 
 服务以 `mgate` 用户运行、监听 `127.0.0.1:8080`；在其前置反向代理终结 HTTPS 后，浏览器打开
-`https://你的域名/#/setup` 创建管理员即可。重跑同一命令即为升级（保留配置与数据）。
-可选环境变量 `MGATE_BASE_URL` / `MGATE_ADMIN_USERNAME` / `MGATE_ADMIN_PASSWORD` / `VERSION`，
-用法见 [README](../README.md#-一键安装linux-生产部署)。下面是等价的手动步骤，供需要自定义时参考。
+`https://你的域名/#/setup` 创建管理员并完成初始化即可。重跑同一命令即为升级（保留配置与数据）。
+卸载见 `scripts/uninstall.sh`。下面是等价的手动步骤，供需要自定义时参考。
 
 ## 获取产物
 
