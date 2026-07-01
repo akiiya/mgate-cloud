@@ -70,7 +70,7 @@ go build -o mgate-cloud ./cmd/mgate-cloud
 
 | 文档 | 内容 |
 |------|------|
-| [docs/architecture.md](docs/architecture.md) | 架构、分层、数据模型、各阶段设计 |
+| [docs/architecture.md](docs/architecture.md) | 架构、分层、数据模型与设计要点 |
 | [docs/development.md](docs/development.md) | 本地开发、接口速览、模拟器、手动验证 |
 | [docs/protocol.md](docs/protocol.md) | 设备码与 enroll 协议 |
 | [docs/agent-ws.md](docs/agent-ws.md) | Agent WebSocket 协议 |

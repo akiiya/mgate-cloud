@@ -1,10 +1,10 @@
 # 设备绑定协议 🔗
 
-本文描述 Phase 2 的设备身份协议：设备码设计、enroll 流程与安全取舍。
+本文描述设备身份协议：设备码设计、enroll 流程与安全取舍。
 
-> 本文聚焦"设备码 + enroll"（Phase 2）。绑定之后的 **Agent WebSocket 连接/状态**（Phase 3）见
-> [agent-ws.md](agent-ws.md)；**白名单命令通道**（Phase 4）见 [commands.md](commands.md)；
-> **HTTPS Pull 兜底**（Phase 5）见 [agent-pull.md](agent-pull.md)。
+> 本文聚焦"设备码 + enroll"。绑定之后的 **Agent WebSocket 连接/状态**见
+> [agent-ws.md](agent-ws.md)；**白名单命令通道**见 [commands.md](commands.md)；
+> **HTTPS Pull 兜底**见 [agent-pull.md](agent-pull.md)。
 >
 > 边界提醒：身份、连接、命令与 Pull 通道均**不让 cloud 直接控制系统**——cloud 只投递白名单 action 的
 > JSON，【没有】远程 shell、【没有】拼接 mgate.sh；真正调用 mgate.sh 是 mgate-agent 的职责。
@@ -26,7 +26,7 @@
 - `pending`：已创建未绑定，可生成设备码。
 - `enabled`：已绑定，拥有有效长期凭证。
 - `disabled`：已禁用，拒绝 agent enroll；不可生成设备码。
-- `deleted`：软删除（Phase 2 暂不提供入口，预留）。
+- `deleted`：软删除（暂不提供入口，预留）。
 
 ## 一次性设备码设计
 
@@ -102,8 +102,8 @@ Content-Type: application/json
 }
 ```
 
-> `ws_url` / `pull_url` 仅为**预告**返回，方便 agent 预留配置；
-> Phase 2 **并未实现**这两个端点。
+> `ws_url` / `pull_url` 是返回给 agent 的连接地址，供其后续接入
+> **Agent WebSocket** 与 **HTTPS Pull 兜底**通道。
 
 失败响应：
 

@@ -1,10 +1,10 @@
 # Agent Pull 兜底通道 📥
 
-本文描述 Phase 5 的 HTTPS Pull 兜底通道：当 agent 无法保持 WebSocket 长连接时，
+本文描述 HTTPS Pull 兜底通道：当 agent 无法保持 WebSocket 长连接时，
 通过周期性 HTTPS 轮询完成心跳、状态上报、命令领取与 ack/result 提交。
 
 > 边界提醒：Pull 与 WS 一样，cloud 只校验白名单 action 并下发 JSON，**不执行命令、不拼接 shell**；
-> 真正调用设备本地 `mgate.sh` 是 `mgate-agent` 的职责。本阶段无 Telegram、无远程 shell。
+> 真正调用设备本地 `mgate.sh` 是 `mgate-agent` 的职责。控制面无 Telegram、无远程 shell。
 
 ## 为什么需要 Pull
 
@@ -72,8 +72,8 @@ Content-Type: application/json
 2. 解析请求（限大小、拒未知字段）。
 3. 更新设备：`last_seen_at` / `last_pull_at` / 版本 / hostname / capabilities。
 4. 若带 `status`：更新 `device_latest_status`（`source=pull`）、插入快照、更新 `last_pull_status_at`，写 `device.pull.status_reported`。
-5. 处理 `acks`（复用 Phase 4 ack 逻辑，校验命令归属）。
-6. 处理 `results`（复用 Phase 4 result 逻辑，截断、幂等；单条异常不影响整体）。
+5. 处理 `acks`（复用命令 ack 逻辑，校验命令归属）。
+6. 处理 `results`（复用命令 result 逻辑，截断、幂等；单条异常不影响整体）。
 7. lease 待投递命令并置 `sent`，放入响应。
 8. 若领取到命令，写 `device.pull`（metadata 仅记 count）。
 
@@ -88,7 +88,7 @@ Content-Type: application/json
 
 ## 离线命令队列
 
-Phase 5 起：**enabled 设备无论在线与否都可创建命令**。
+**enabled 设备无论在线与否都可创建命令**。
 
 - 在线且 WS 投递成功 → `delivered_via_ws`
 - 在线但投递失败 → `queued_for_retry`（保持 pending，等待重试）
