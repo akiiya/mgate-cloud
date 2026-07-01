@@ -37,42 +37,29 @@ MGATE_ADMIN_USERNAME=admin MGATE_ADMIN_PASSWORD=change-me ./dist/mgate-cloud
 
 或用 Make：`make build`、`make test`、`make run`、`make help`。
 
-## 🐧 一键安装（Linux 生产部署）
+## 🐧 一键安装（Linux）
 
-自动完成：下载校验二进制 → 创建系统用户与数据目录 → 生成运行配置 → 安装并启动 systemd 服务。
+下载校验二进制、创建服务用户、生成配置、安装并启动 systemd 服务：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/install.sh | sudo bash
 ```
 
-装好后服务以 `mgate` 用户运行、监听 `127.0.0.1:8080`（请在其前置 Caddy/Nginx 终结 HTTPS）。
-浏览器打开 `https://你的域名/#/setup` 创建管理员即可。**升级**：重跑同一命令（保留配置与数据）。
-
-> 更稳妥的做法是**先下载审阅再执行**（`curl | sudo bash` 等于把 root 交给远端脚本）：
-> `curl -fsSL .../scripts/install.sh -o install.sh && less install.sh && sudo bash install.sh`。
-
-非交互初始化（直接建管理员、指定对外地址 / 版本，可选）：
+服务以 `mgate` 用户运行、监听 `127.0.0.1:8080`；前置 Caddy/Nginx 终结 HTTPS 后，浏览器打开
+`https://你的域名/#/setup` 创建管理员。**升级**：重跑该命令（保留数据）。
 
 ```bash
+# 非交互初始化（可选，直接建管理员 / 指定对外地址）
 curl -fsSL https://raw.githubusercontent.com/akiiya/mgate-cloud/main/scripts/install.sh \
   | sudo MGATE_BASE_URL=https://cloud.example.com \
          MGATE_ADMIN_USERNAME=admin MGATE_ADMIN_PASSWORD='强口令' bash
+
+# 卸载
+sudo bash scripts/uninstall.sh              # 完全卸载（二次确认）
+sudo bash scripts/uninstall.sh --keep-data  # 保留数据，便于重装
 ```
 
-| 环境变量 | 作用 |
-|------|------|
-| `MGATE_BASE_URL` | 对外访问地址（`https://` 时自动开启 Secure Cookie） |
-| `MGATE_ADMIN_USERNAME` / `MGATE_ADMIN_PASSWORD` | 直接创建管理员（否则走浏览器 Setup） |
-| `VERSION` | 指定版本（默认最新 Release） |
-
-卸载：
-
-```bash
-sudo bash scripts/uninstall.sh              # 完全卸载（含数据/配置/用户，会二次确认）
-sudo bash scripts/uninstall.sh --keep-data  # 保留数据与配置，便于日后重装
-```
-
-> 反向代理示例见 [`deploy/Caddyfile.example`](deploy/Caddyfile.example) / [`deploy/nginx.conf.example`](deploy/nginx.conf.example)；生产要点见 [docs/deployment.md](docs/deployment.md)。
+> 反向代理示例见 [`deploy/`](deploy)；生产要点见 [docs/deployment.md](docs/deployment.md)。
 
 分项验收命令：
 
